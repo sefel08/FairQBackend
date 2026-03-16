@@ -14,4 +14,6 @@ public class Track {
     private String name;
     private List<String> artists;
     private String imageUrl;
+    private long durationMs;
+    private String spotifyUrl;
 }

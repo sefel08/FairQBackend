@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -17,10 +18,19 @@ public class AuthController {
         if (user == null) {
             return Map.of("isLoggedIn", false);
         }
+
+        String imageUrl = "None";
+        List<Map<String, Object>> images = user.getAttribute("images");
+        if (images != null && !images.isEmpty()) {
+            Map<String, Object> firstImage = images.getFirst();
+            imageUrl = (String) firstImage.get("url");
+        }
+
         return Map.of(
                 "isLoggedIn", true,
                 "name", user.getAttribute("display_name"),
-                "email", user.getAttribute("email")
+                "email", user.getAttribute("email"),
+                "image_url", imageUrl
         );
     }
 }

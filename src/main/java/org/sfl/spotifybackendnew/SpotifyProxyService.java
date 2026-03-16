@@ -86,14 +86,15 @@ public class SpotifyProxyService {
         }
     }
 
-
     //helper methods
     private Track mapToTrackDTO(SpotifyTrack track) {
         return new Track(
                 track.getId(),
                 track.getName(),
                 getArtistNames(track.getArtists()),
-                getImageUrl(track.getImages())
+                getImageUrl(track.getImages()),
+                track.getDurationMs(),
+                track.getSpotifyUrl()
         );
     }
     private Playlist mapToPlaylistDTO(SpotifySimplePlaylist playlist) {
