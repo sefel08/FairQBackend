@@ -2,7 +2,9 @@ package org.sfl.spotifybackendnew.Objects.Party;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Objects.SmartQueue.SmartQueue;
 
 import java.util.List;
@@ -19,17 +21,18 @@ public class PartySession {
 
     private final Map<UUID, PartyUser> userMap = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<UUID> joinOrder = new CopyOnWriteArrayList<>();
+
     private final SmartQueue queue = new SmartQueue(userMap, joinOrder);
 
     public PartySession(String partyId) {
         this.partyId = partyId;
     }
 
-    public void addUser(UUID userId) {
+    public void addUser(UUID userId, UserProfile profile) {
         if (userMap.containsKey(userId))
             return;
 
-        PartyUser user = new PartyUser(userId);
+        PartyUser user = new PartyUser(userId, profile);
         userMap.put(userId, user);
         joinOrder.add(userId);
 
@@ -40,8 +43,6 @@ public class PartySession {
         if (userMap.containsKey(userId)) {
             userMap.remove(userId);
             joinOrder.remove(userId);
-            queue.refreshQueue();
-
             log.info("Removed user {} from party with id {}", userId, partyId);
             log.info("Current users in party {}: {} ({})", partyId, userMap.keySet(), userMap.size());
         }
@@ -57,16 +58,18 @@ public class PartySession {
     public void addToUserQueue(UUID userId, Track track) {
         PartyUser user = getPartyUser(userId);
         if (user != null) {
-            user.getQueue().add(track);
-            queue.refreshQueue();
+            user.addTrack(track);
         }
     }
     public void removeFromUserQueue(UUID userId, int index) {
         PartyUser user = getPartyUser(userId);
         if (user != null) {
-            user.getQueue().remove(index);
-            queue.refreshQueue();
+            user.removeTrack(index);
         }
+    }
+
+    public List<AddedTrack> getPartyQueue() {
+        return queue.getQueue();
     }
 
     private PartyUser getPartyUser(UUID userId) {

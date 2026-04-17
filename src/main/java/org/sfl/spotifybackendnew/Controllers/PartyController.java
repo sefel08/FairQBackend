@@ -1,5 +1,6 @@
 package org.sfl.spotifybackendnew.Controllers;
 
+import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.Services.Party.PartyService;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
@@ -52,5 +53,13 @@ public class PartyController {
             return;
         }
         partyService.removeFromUserQueue(user.getPartyId(), user.getUserId(), deleteTrackRequest.index);
+    }
+
+    @GetMapping("/partyQueue")
+    public List<AddedTrack> getPartyQueue(@AuthenticationPrincipal UserData user) {
+        if (user.getPartyId() == null) {
+            return List.of();
+        }
+        return partyService.getPartyQueue(user.getPartyId());
     }
 }

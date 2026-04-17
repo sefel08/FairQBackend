@@ -1,5 +1,7 @@
 package org.sfl.spotifybackendnew.Objects.SmartQueue;
 
+import org.jspecify.annotations.NonNull;
+import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.Objects.Party.PartyUser;
 
@@ -11,54 +13,56 @@ public class SmartQueue {
 
     private final Map<UUID, PartyUser> userMap;
     private final CopyOnWriteArrayList<UUID> joinOrder;
+    private int playingUserIndex = 0;
 
-    private final AtomicReference<List<Track>> cachedQueue = new AtomicReference<>(new ArrayList<>());
+    private final AtomicReference<List<AddedTrack>> cachedQueue = new AtomicReference<>(new ArrayList<>());
 
     public SmartQueue(Map<UUID, PartyUser> userMap, CopyOnWriteArrayList<UUID> joinOrder) {
         this.userMap = userMap;
         this.joinOrder = joinOrder;
     }
 
-
-    public List<Track> getQueue() {
+    public List<AddedTrack> getQueue() {
         return cachedQueue.get();
     }
+
+    record UserTrack(Track track, int index, int userIndex, PartyUser partyUser) {}
     public void refreshQueue() {
-        List<Track> newQueue = new ArrayList<>();
-        List<UUID> userIds = new ArrayList<>(List.copyOf(joinOrder));
-        Map<UUID, Integer> addedUserTracksCount = new HashMap<>();
+        List<UUID> currentOrder = List.copyOf(joinOrder);
+        List<UserTrack> allTracks = getAllUserTracks(currentOrder);
 
-        // initialize added user tracks count
-        for (UUID userId : userIds) {
-            addedUserTracksCount.put(userId, 0);
-        }
+        // sort tracks by index and joinOrder
+        int currentPlayingUserIndex = playingUserIndex;
+        allTracks.sort(Comparator.comparingInt((UserTrack ut) -> ut.index)
+                .thenComparingInt(ut -> (ut.userIndex < currentPlayingUserIndex) ? currentPlayingUserIndex + ut.userIndex : ut.userIndex - currentPlayingUserIndex));
 
-        while (!userIds.isEmpty()) {
-            List<UUID> userIdsToRemove = new ArrayList<>();
+        // change Tracks to AddedTrack
+        List<AddedTrack> newCalculatedQueue = allTracks.stream()
+                .map(ut -> new AddedTrack(ut.track, ut.partyUser().getProfile()))
+                .toList();
 
-            for (UUID userId : userIds) {
-                int currentTrackId = addedUserTracksCount.get(userId);
-
-                List<Track> userQueueRef = userMap.get(userId).getQueue();
-                newQueue.add(userQueueRef.get(currentTrackId));
-
-                if (userQueueRef.size() <= currentTrackId++)
-                {
-                    userIdsToRemove.add(userId);
-                }
-                else
-                {
-                    addedUserTracksCount.put(userId, currentTrackId++);
-                }
-            }
-
-            userIds.removeAll(userIdsToRemove);
-        }
-
-        updateCache(newQueue);
+        updateCache(newCalculatedQueue);
     }
 
-    private void updateCache(List<Track> newCalculatedQueue) {
+    private void updateCache(List<AddedTrack> newCalculatedQueue) {
         cachedQueue.set(List.copyOf(newCalculatedQueue));
+    }
+    private @NonNull List<UserTrack> getAllUserTracks(List<UUID> currentOrder) {
+        Map<UUID, Integer> userIndexes = new HashMap<>();
+        for (int i = 0; i < currentOrder.size(); i++) {
+            userIndexes.put(currentOrder.get(i), i);
+        }
+
+        // collect all user queues
+        List<UserTrack> allTracks = new ArrayList<>();
+        for (PartyUser user : userMap.values()) {
+            int userIndex = userIndexes.get(user.getId());
+            List<Track> userQueue = user.getQueue();
+            for (int i = 0; i < userQueue.size(); i++) {
+                allTracks.add(new UserTrack(userQueue.get(i), i, userIndex, user));
+            }
+        }
+
+        return allTracks;
     }
 }

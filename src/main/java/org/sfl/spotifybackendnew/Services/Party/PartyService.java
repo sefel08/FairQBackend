@@ -1,8 +1,10 @@
 package org.sfl.spotifybackendnew.Services.Party;
 
 import lombok.extern.slf4j.Slf4j;
+import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
+import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Exceptions.PartyNotFoundException;
 import org.sfl.spotifybackendnew.Objects.Party.PartySession;
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyProxyService;
@@ -40,7 +42,9 @@ public class PartyService {
     public void joinParty(String partyId, UserData user) {
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
-        party.addUser(user.getUserId());
+
+        UserProfile profile = new UserProfile(user.getDisplayName(), user.isSpotifyAuthenticated(), user.getImageUrl());
+        party.addUser(user.getUserId(), profile);
         user.setPartyId(partyId);
     }
     public void removeUserFromParty(String partyId, UUID userId) {
@@ -81,5 +85,11 @@ public class PartyService {
         log.info("removing track #{} on user {} queue in party {}", index, userId, partyId);
 
         party.removeFromUserQueue(userId, index);
+    }
+
+    public List<AddedTrack> getPartyQueue(String partyId) {
+        PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
+                .orElseThrow(() -> new PartyNotFoundException(partyId));
+        return party.getPartyQueue();
     }
 }
