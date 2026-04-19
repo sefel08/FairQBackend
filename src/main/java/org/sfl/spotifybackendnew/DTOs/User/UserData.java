@@ -23,14 +23,17 @@ public class UserData implements UserDetails {
     private final String spotifyId;
     @Getter @Nullable
     private final String imageUrl;
+    @Getter @Nullable
+    private final String smallImageUrl;
 
-    public UserData(UUID userId, String displayName, String partyId, boolean isSpotifyAuthenticated, @Nullable String spotifyId, @Nullable String imageUrl) {
+    public UserData(UUID userId, String displayName, String partyId, boolean isSpotifyAuthenticated, @Nullable String spotifyId, @Nullable String imageUrl, @Nullable String smallImageUrl) {
         this.userId = userId;
         this.displayName = displayName;
         this.partyId = partyId;
         this.isSpotifyAuthenticated = isSpotifyAuthenticated;
         this.spotifyId = spotifyId;
         this.imageUrl = imageUrl;
+        this.smallImageUrl = smallImageUrl;
     }
 
     @Override

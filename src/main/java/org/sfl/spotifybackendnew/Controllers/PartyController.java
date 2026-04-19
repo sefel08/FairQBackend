@@ -2,6 +2,7 @@ package org.sfl.spotifybackendnew.Controllers;
 
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Services.Party.PartyService;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,15 +21,15 @@ public class PartyController {
     }
 
     // only for authenticated via spotify users, so UserData always contain spotifyId
-    @PostMapping("/create")
-    public void createParty(@AuthenticationPrincipal UserData user) {
+    @PostMapping
+    public String createParty(@AuthenticationPrincipal UserData user) {
         partyService.createParty(user.getSpotifyId());
+        return user.getSpotifyId();
     }
     @PostMapping("/join")
     public void joinParty(@AuthenticationPrincipal UserData user, @RequestParam String partyId) {
         partyService.joinParty(partyId, user);
     }
-
 
     public record AddTrackRequest(String trackId) {}
     public record DeleteTrackRequest(int index) {}
@@ -38,7 +39,7 @@ public class PartyController {
         if (user.getPartyId() == null) {
             return List.of();
         }
-        return partyService.getQueue(user.getPartyId(), user.getUserId());
+        return partyService.getUserQueue(user.getPartyId(), user.getUserId());
     }
     @PostMapping("/queue")
     public void addToQueue(@AuthenticationPrincipal UserData user, @RequestBody AddTrackRequest addTrackRequest) {
@@ -61,5 +62,13 @@ public class PartyController {
             return List.of();
         }
         return partyService.getPartyQueue(user.getPartyId());
+    }
+
+    @GetMapping("/users")
+    public List<UserProfile> getPartyUsers(@AuthenticationPrincipal UserData user) {
+        if (user.getPartyId() == null) {
+            return List.of();
+        }
+        return partyService.getPartyUsers(user.getPartyId());
     }
 }

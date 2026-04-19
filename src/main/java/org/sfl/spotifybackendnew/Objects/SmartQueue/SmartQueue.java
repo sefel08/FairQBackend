@@ -23,6 +23,7 @@ public class SmartQueue {
     }
 
     public List<AddedTrack> getQueue() {
+        refreshQueue();
         return cachedQueue.get();
     }
 

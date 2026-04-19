@@ -26,7 +26,7 @@ public class AuthController {
         status.put("isSpotifyAuthenticated", user.isSpotifyAuthenticated());
         status.put("displayName", user.getDisplayName());
         status.put("imageUrl", user.getImageUrl());
-        status.put("spotifyId", user.getSpotifyId());
+        status.put("smallImageUrl", user.getSmallImageUrl());
 
         return status;
     }

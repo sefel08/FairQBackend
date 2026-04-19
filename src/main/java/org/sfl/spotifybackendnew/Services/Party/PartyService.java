@@ -43,7 +43,7 @@ public class PartyService {
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
 
-        UserProfile profile = new UserProfile(user.getDisplayName(), user.isSpotifyAuthenticated(), user.getImageUrl());
+        UserProfile profile = new UserProfile(user.getDisplayName(), user.isSpotifyAuthenticated(), user.getImageUrl(), user.getSmallImageUrl());
         party.addUser(user.getUserId(), profile);
         user.setPartyId(partyId);
     }
@@ -73,7 +73,7 @@ public class PartyService {
 
         party.addToUserQueue(userId, track);
     }
-    public List<Track> getQueue(String partyId, UUID userId) {
+    public List<Track> getUserQueue(String partyId, UUID userId) {
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
         return party.getUserQueue(userId);
@@ -91,5 +91,11 @@ public class PartyService {
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
         return party.getPartyQueue();
+    }
+
+    public List<UserProfile> getPartyUsers(String partyId) {
+        PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
+                .orElseThrow(() -> new PartyNotFoundException(partyId));
+        return party.getPartyUsers();
     }
 }

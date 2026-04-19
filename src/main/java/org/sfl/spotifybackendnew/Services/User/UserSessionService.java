@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.sfl.spotifybackendnew.Services.Party.PartyService;
+import org.sfl.spotifybackendnew.SpotifyDTOs.SubDTOs.SpotifyImage;
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -15,6 +16,8 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.session.HttpSessionDestroyedEvent;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Map;
@@ -23,12 +26,20 @@ import java.util.UUID;
 @Slf4j
 @Service
 public class UserSessionService {
+
+    private final JsonMapper mapper;
+
+    public UserSessionService(JsonMapper mapper) {
+        this.mapper = mapper;
+    }
+
     public void initializeSessionForGuest(HttpServletRequest request, HttpServletResponse response, String displayName) {
         UserData userData = new UserData(
                 UUID.randomUUID(),
                 displayName,
                 null,
                 false,
+                null,
                 null,
                 null
         );
@@ -51,12 +62,24 @@ public class UserSessionService {
     public void initializeSessionAfterSpotifyLogin(Authentication authentication, HttpServletRequest request, HttpServletResponse response, UUID oldUserId, String oldPartyId) {
         OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
 
-        // get profile picture from current session
-        String imageUrl = "None";
-        List<Map<String, Object>> images = oauthUser.getAttribute("images");
-        if (images != null && !images.isEmpty()) {
-            imageUrl = (String) images.getFirst().get("url");
-        }
+        // get profile picture for session
+        Object rawImages = oauthUser.getAttribute("images");
+        List<SpotifyImage> spotifyImages = mapper.convertValue(
+                rawImages,
+                new TypeReference<List<SpotifyImage>>() {}
+        );
+
+        String imageUrl = spotifyImages.stream()
+                .filter(img -> img.getWidth() == 300)
+                .map(SpotifyImage::getUrl)
+                .findFirst()
+                .orElse(spotifyImages.isEmpty() ? "" : spotifyImages.getFirst().getUrl());
+
+        String smallImageUrl = spotifyImages.stream()
+                .filter(img -> img.getWidth() == 64)
+                .map(SpotifyImage::getUrl)
+                .findFirst()
+                .orElse(imageUrl);
 
         // create new user session object
         UserData userData = new UserData(
@@ -65,7 +88,8 @@ public class UserSessionService {
                 oldPartyId,
                 true,
                 oauthUser.getName(),
-                imageUrl
+                imageUrl,
+                smallImageUrl
         );
 
         log.info("Initialized session for Spotify user: {}, spotifyId: {} with id: {}", userData.getDisplayName(), userData.getSpotifyId(), userData.getUserId());

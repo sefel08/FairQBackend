@@ -7,6 +7,7 @@ import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Objects.SmartQueue.SmartQueue;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -70,6 +71,19 @@ public class PartySession {
 
     public List<AddedTrack> getPartyQueue() {
         return queue.getQueue();
+    }
+
+    public List<UserProfile> getPartyUsers() {
+        List<UserProfile> users = new ArrayList<>(joinOrder.size());
+
+        for (UUID userId : joinOrder) {
+            PartyUser user = userMap.get(userId);
+            if (user != null) {
+                users.add(user.getProfile());
+            }
+        }
+
+        return users;
     }
 
     private PartyUser getPartyUser(UUID userId) {
