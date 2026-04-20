@@ -2,9 +2,12 @@ package org.sfl.spotifybackendnew.Controllers;
 
 import org.sfl.spotifybackendnew.DTOs.Music.Playlist;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.User.UserData;
+import org.sfl.spotifybackendnew.Services.Security.SpotifyAuthorizedClientService;
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyProxyService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,9 +19,11 @@ import java.util.List;
 @RequestMapping("/api/spotify")
 public class SpotifyProxyController {
 
+    private final SpotifyAuthorizedClientService spotifyAuthorizedClientService;
     private final SpotifyProxyService spotifyProxyService;
 
-    public SpotifyProxyController(SpotifyProxyService spotifyProxyService) {
+    public SpotifyProxyController(SpotifyAuthorizedClientService spotifyAuthorizedClientService, SpotifyProxyService spotifyProxyService) {
+        this.spotifyAuthorizedClientService = spotifyAuthorizedClientService;
         this.spotifyProxyService = spotifyProxyService;
     }
 
@@ -28,16 +33,14 @@ public class SpotifyProxyController {
     }
 
     @GetMapping("/user-playlists")
-    public List<Playlist> getUserPlaylists(@RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient) {
+    public List<Playlist> getUserPlaylists(@AuthenticationPrincipal UserData user, Authentication authentication) {
+        OAuth2AuthorizedClient authorizedClient = spotifyAuthorizedClientService.getAuthorizedClient(user, authentication);
         return spotifyProxyService.getUserPlaylists(authorizedClient);
     }
 
     @GetMapping("/playlist")
-    public List<Track> getPlaylistTracks(@RegisteredOAuth2AuthorizedClient("spotify") OAuth2AuthorizedClient authorizedClient, @RequestParam String playlistId) {
-        try {
-            return spotifyProxyService.getPlaylistTracks(authorizedClient, playlistId);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch playlist tracks: " + e.getMessage(), e);
-        }
+    public List<Track> getPlaylistTracks(@AuthenticationPrincipal UserData user, Authentication authentication, @RequestParam String playlistId) {
+        OAuth2AuthorizedClient authorizedClient = spotifyAuthorizedClientService.getAuthorizedClient(user, authentication);
+        return spotifyProxyService.getPlaylistTracks(authorizedClient, playlistId);
     }
 }

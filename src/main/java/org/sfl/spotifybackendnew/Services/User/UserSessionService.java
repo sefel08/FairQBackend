@@ -21,6 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -38,6 +39,8 @@ public class UserSessionService {
                 UUID.randomUUID(),
                 displayName,
                 null,
+                false,
+                false,
                 false,
                 null,
                 null,
@@ -60,7 +63,15 @@ public class UserSessionService {
         repo.saveContext(context, request, response);
     }
     public void initializeSessionAfterSpotifyLogin(Authentication authentication, HttpServletRequest request, HttpServletResponse response, UUID oldUserId, String oldPartyId) {
-        OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
+        if (authentication == null || !(authentication.getPrincipal() instanceof OAuth2User oauthUser)) {
+            log.error("Failed to initialize session after Spotify login: authentication principal is not an OAuth2User");
+            return;
+        }
+
+        boolean isPremium =  oauthUser.getAttribute("product") != null && Objects.equals(oauthUser.getAttribute("product"), "premium");
+
+        boolean hasHostPermissions = oauthUser.getAuthorities().stream()
+                .anyMatch(a -> Objects.equals(a.getAuthority(), "SCOPE_streaming"));
 
         // get profile picture for session
         Object rawImages = oauthUser.getAttribute("images");
@@ -87,6 +98,8 @@ public class UserSessionService {
                 oauthUser.getAttribute("display_name"),
                 oldPartyId,
                 true,
+                isPremium,
+                hasHostPermissions,
                 oauthUser.getName(),
                 imageUrl,
                 smallImageUrl

@@ -19,6 +19,10 @@ public class UserData implements UserDetails {
 
     @Getter
     private final boolean isSpotifyAuthenticated;
+    @Getter
+    private final boolean isPremium;
+    @Getter
+    private final boolean hasHostPermissions;
     @Getter @Nullable
     private final String spotifyId;
     @Getter @Nullable
@@ -26,11 +30,13 @@ public class UserData implements UserDetails {
     @Getter @Nullable
     private final String smallImageUrl;
 
-    public UserData(UUID userId, String displayName, String partyId, boolean isSpotifyAuthenticated, @Nullable String spotifyId, @Nullable String imageUrl, @Nullable String smallImageUrl) {
+    public UserData(UUID userId, String displayName, String partyId, boolean isSpotifyAuthenticated, boolean isPremium, boolean hasHostPermissions, @Nullable String spotifyId, @Nullable String imageUrl, @Nullable String smallImageUrl) {
         this.userId = userId;
         this.displayName = displayName;
         this.partyId = partyId;
         this.isSpotifyAuthenticated = isSpotifyAuthenticated;
+        this.isPremium = isPremium;
+        this.hasHostPermissions = hasHostPermissions;
         this.spotifyId = spotifyId;
         this.imageUrl = imageUrl;
         this.smallImageUrl = smallImageUrl;
