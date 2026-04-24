@@ -7,6 +7,8 @@ import org.sfl.spotifybackendnew.Services.Security.SpotifyAuthorizedClientServic
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyPlayerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -48,11 +50,25 @@ public class PlayerController {
         }
     }
 
+    record PlayNextResponse(boolean played, String message) {}
     @PostMapping("/playNext")
-    public void playNextTrack(@AuthenticationPrincipal UserData user) {
-        if (!user.isHasHostPermissions() || !user.isPremium()) return;
-        // only for party owner (party player)
-        if (!Objects.equals(user.getPartyId(), user.getSpotifyId())) return;
-        partyService.playNextTrack(user.getPartyId());
+    public ResponseEntity<?> playNextTrack(@AuthenticationPrincipal UserData user) {
+        if (!user.isHasHostPermissions() || !user.isPremium()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new PlayNextResponse(false, "Missing Host permissions or Premium account"));
+        }
+
+        if (!Objects.equals(user.getPartyId(), user.getSpotifyId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new PlayNextResponse(false, "You are not the owner of this party"));
+        }
+
+        boolean played = partyService.playNextTrack(user.getPartyId());
+
+        if (!played) {
+            return ResponseEntity.ok(new PlayNextResponse(false, "Queue is empty or player is out"));
+        }
+
+        return ResponseEntity.ok(new PlayNextResponse(true, "Successfully skipped to next track"));
     }
 }

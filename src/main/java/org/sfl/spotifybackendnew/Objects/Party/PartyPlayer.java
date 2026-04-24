@@ -38,19 +38,20 @@ public class PartyPlayer {
         this.spotifyPlayerService = spotifyPlayerService;
     }
 
-    public synchronized void playNextTrack() {
+    public synchronized boolean playNextTrack() {
         Track nextTrack = partyQueue.pollTrack();
         // if party queue is empty
         if (nextTrack == null) {
             waitsForNewTrack.set(true);
             log.info("Party player in party {} is waiting for new track", playerUser.getPartyId());
-            return;
+            return false;
         }
         spotifyPlayerService.playTrack(
                 spotifyAuthorizedClientService.getAuthorizedClient(playerUser, playerAuthentication),
                 nextTrack.getUri(),
                 deviceId
         );
+        return true;
     }
     public synchronized void notifyNewTrackAdded() {
         if (waitsForNewTrack.compareAndSet(true, false)) {

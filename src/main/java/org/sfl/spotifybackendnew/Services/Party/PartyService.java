@@ -69,10 +69,10 @@ public class PartyService {
         log.info("Initializing party player for user {} in party {}", user.getUserId(), user.getPartyId());
         party.initializePlayer(player);
     }
-    public void playNextTrack(String partyId) {
+    public boolean playNextTrack(String partyId) {
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
-        party.playNext();
+        return party.playNext();
     }
 
     public void addToUserQueue(String partyId, UUID userId, String trackId) {

@@ -54,10 +54,10 @@ public class PartySession {
         partyPlayer = player;
     }
 
-    public void playNext() {
+    public boolean playNext() {
         PartyPlayer player = this.partyPlayer; // thread safe read
-        if (partyPlayer == null) return;
-        partyPlayer.playNextTrack();
+        if (partyPlayer == null) return false;
+        return partyPlayer.playNextTrack();
     }
 
     public List<Track> getUserQueue(UUID userId) {
