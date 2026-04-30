@@ -46,7 +46,7 @@ public class PartyService {
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
 
-        UserProfile profile = new UserProfile(user.getDisplayName(), user.isSpotifyAuthenticated(), user.getImageUrl(), user.getSmallImageUrl());
+        UserProfile profile = new UserProfile(user.getDisplayName(), user.isSpotifyAuthenticated(), user.getSpotifyId(), user.getImageUrl(), user.getSmallImageUrl());
         party.addUser(user.getUserId(), profile);
         user.setPartyId(partyId);
     }
@@ -54,6 +54,12 @@ public class PartyService {
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
         party.removeUser(userId);
+    }
+    public void updateUserProfile(String partyId, UserData user) {
+        PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
+                .orElseThrow(() -> new PartyNotFoundException(partyId));
+        UserProfile profile = new UserProfile(user.getDisplayName(), user.isSpotifyAuthenticated(), user.getSpotifyId(), user.getImageUrl(), user.getSmallImageUrl());
+        party.updateUser(user.getUserId(), profile);
     }
 
     public void initializePartyPlayer(UserData user, Authentication authentication, String deviceId, SpotifyAuthorizedClientService spotifyAuthorizedClientService, SpotifyPlayerService spotifyPlayerService) {

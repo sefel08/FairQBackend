@@ -2,6 +2,7 @@ package org.sfl.spotifybackendnew.Services.User;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.sfl.spotifybackendnew.Services.Party.PartyService;
@@ -29,9 +30,11 @@ import java.util.UUID;
 public class UserSessionService {
 
     private final JsonMapper mapper;
+    private final PartyService partyService;
 
-    public UserSessionService(JsonMapper mapper) {
+    public UserSessionService(JsonMapper mapper, PartyService partyService) {
         this.mapper = mapper;
+        this.partyService = partyService;
     }
 
     public void initializeSessionForGuest(HttpServletRequest request, HttpServletResponse response, String displayName) {
@@ -68,7 +71,7 @@ public class UserSessionService {
             return;
         }
 
-        boolean isPremium =  oauthUser.getAttribute("product") != null && Objects.equals(oauthUser.getAttribute("product"), "premium");
+        boolean isPremium =  Objects.equals(oauthUser.getAttribute("product"), "premium");
 
         boolean hasHostPermissions = oauthUser.getAuthorities().stream()
                 .anyMatch(a -> Objects.equals(a.getAuthority(), "SCOPE_streaming"));
@@ -106,6 +109,12 @@ public class UserSessionService {
         );
 
         log.info("Initialized session for Spotify user: {}, spotifyId: {} with id: {}", userData.getDisplayName(), userData.getSpotifyId(), userData.getUserId());
+
+        // if user was in party update his profile
+        if (oldUserId != null && oldPartyId != null) {
+            log.info("User with id {} was in party and logged in via spotify, updating party session with new spotify authenticated profile", userData.getUserId());
+            partyService.updateUserProfile(oldPartyId, userData);
+        }
 
         // register new session object
         UsernamePasswordAuthenticationToken newAuth = new UsernamePasswordAuthenticationToken(

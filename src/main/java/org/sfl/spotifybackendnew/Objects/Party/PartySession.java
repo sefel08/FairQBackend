@@ -7,12 +7,8 @@ import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Objects.SmartQueue.SmartQueue;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Slf4j
@@ -26,29 +22,47 @@ public class PartySession {
     private final SmartQueue queue = new SmartQueue(userMap, joinOrder);
     private PartyPlayer partyPlayer;
 
+    private final Object userMapLock = new Object();
+
     public PartySession(String partyId) {
         this.partyId = partyId;
     }
 
     public void addUser(UUID userId, UserProfile profile) {
-        if (userMap.containsKey(userId))
-            return;
+        synchronized (userMapLock) {
+            if (userMap.containsKey(userId))
+                return;
 
-        PartyUser user = new PartyUser(userId, profile);
-        userMap.put(userId, user);
-        joinOrder.add(userId);
+            deleteDuplicateUser(profile, userId);
 
-        log.info("Adding user {} to party with id {}", userId, partyId);
-        log.info("Current users in party {}: {} ({})", partyId, userMap.keySet(), userMap.size());
-    }
-    public void removeUser(UUID userId) {
-        if (userMap.containsKey(userId)) {
-            userMap.remove(userId);
-            joinOrder.remove(userId);
-            log.info("Removed user {} from party with id {}", userId, partyId);
+            PartyUser user = new PartyUser(userId, profile);
+            userMap.put(userId, user);
+            joinOrder.add(userId);
+
+            log.info("Adding user {} to party with id {}", userId, partyId);
             log.info("Current users in party {}: {} ({})", partyId, userMap.keySet(), userMap.size());
         }
     }
+    public void removeUser(UUID userId) {
+        synchronized (userMapLock) {
+            if (userMap.containsKey(userId)) {
+                userMap.remove(userId);
+                joinOrder.remove(userId);
+                log.info("Removed user {} from party with id {}", userId, partyId);
+                log.info("Current users in party {}: {} ({})", partyId, userMap.keySet(), userMap.size());
+            }
+        }
+    }
+    public void updateUser(UUID userId, UserProfile profile) {
+        synchronized (userMapLock) {
+            if (userMap.containsKey(userId)) {
+                userMap.get(userId).setProfile(profile);
+            }
+
+            deleteDuplicateUser(profile, userId);
+        }
+    }
+
     public void initializePlayer(PartyPlayer player) {
         player.setPartyQueue(queue);
         partyPlayer = player;
@@ -106,5 +120,19 @@ public class PartySession {
 
     private PartyUser getPartyUser(UUID userId) {
         return userMap.get(userId);
+    }
+    private void deleteDuplicateUser(UserProfile profile, UUID validUserId) {
+        if (profile.spotifyAuthorized()) {
+            for (PartyUser user : userMap.values()) {
+                if (user.getId() == validUserId) continue;
+                UserProfile userProfile = user.getProfile();
+                if (userProfile.spotifyAuthorized() && Objects.equals(userProfile.spotifyId(), profile.spotifyId())) {
+                    userMap.remove(user.getId());
+                    joinOrder.remove(user.getId());
+                    log.info("Removed duplicate spotify user {} from party with id {}", profile.spotifyId(), partyId);
+                    break;
+                }
+            }
+        }
     }
 }
