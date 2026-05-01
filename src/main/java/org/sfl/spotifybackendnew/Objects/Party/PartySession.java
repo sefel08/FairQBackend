@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.Party.PartySettings;
 import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Objects.SmartQueue.SmartQueue;
 
@@ -15,6 +16,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class PartySession {
     @Getter
     private final String partyId;
+    @Getter
+    private PartySettings partySettings;
 
     private final Map<UUID, PartyUser> userMap = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<UUID> joinOrder = new CopyOnWriteArrayList<>();
@@ -24,8 +27,9 @@ public class PartySession {
 
     private final Object userMapLock = new Object();
 
-    public PartySession(String partyId) {
+    public PartySession(String partyId, PartySettings partySettings) {
         this.partyId = partyId;
+        this.partySettings = partySettings;
     }
 
     public void addUser(UUID userId, UserProfile profile) {
@@ -116,6 +120,17 @@ public class PartySession {
         }
 
         return users;
+    }
+
+    public boolean voteForSkip(UUID userId) {
+        PartyPlayer player = this.partyPlayer; // thread safe read
+        if (player == null) return false;
+        return player.voteForSkip(userId);
+    }
+    public int getTotalUsers() {
+        synchronized (userMapLock) {
+            return userMap.size();
+        }
     }
 
     private PartyUser getPartyUser(UUID userId) {

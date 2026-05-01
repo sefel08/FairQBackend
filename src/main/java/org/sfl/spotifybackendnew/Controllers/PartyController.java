@@ -1,8 +1,11 @@
 package org.sfl.spotifybackendnew.Controllers;
 
+import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.Party.PartySettings;
 import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
+import org.sfl.spotifybackendnew.Exceptions.PartyNotFoundException;
 import org.sfl.spotifybackendnew.Services.Party.PartyService;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -12,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/party")
 public class PartyController {
@@ -38,10 +42,9 @@ public class PartyController {
         return Map.of("inParty", inParty);
     }
 
-    // only for authenticated via spotify users, so UserData always contain spotifyId
     @PostMapping
-    public String createParty(@AuthenticationPrincipal UserData user) {
-        partyService.createParty(user.getSpotifyId());
+    public String createParty(@AuthenticationPrincipal UserData user, @RequestBody PartySettings partySettings) {
+        partyService.createParty(user.getSpotifyId(), partySettings);
         return user.getSpotifyId();
     }
     @PostMapping("/join")
@@ -88,5 +91,18 @@ public class PartyController {
             return List.of();
         }
         return partyService.getPartyUsers(user.getPartyId());
+    }
+
+    @PostMapping("/skip")
+    public boolean voteForSkip(@AuthenticationPrincipal UserData user) {
+        if (user.getPartyId() == null)
+            return false;
+
+        try {
+            return partyService.voteForSkip(user.getPartyId(), user.getUserId());
+        } catch (PartyNotFoundException e) {
+            log.error("Party not found for user {} when voting for skip", user.getUserId());
+            return false;
+        }
     }
 }

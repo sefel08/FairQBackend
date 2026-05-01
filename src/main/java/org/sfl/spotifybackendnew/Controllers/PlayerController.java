@@ -41,9 +41,13 @@ public class PlayerController {
         partyService.initializePartyPlayer(user, authentication, deviceIdRequest.deviceId, spotifyAuthorizedClientService, spotifyPlayerService);
     }
     @PostMapping("/cleanup")
-    public ResponseEntity<?> cleanupPlayer(@RequestParam String deviceId) {
+    public ResponseEntity<?> cleanupPlayer(@AuthenticationPrincipal UserData user) {
+        if (!Objects.equals(user.getPartyId(), user.getSpotifyId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only host can cleanup party player");
+        }
+
         try {
-            partyService.clearPlayer(deviceId);
+            partyService.clearPlayer(user.getPartyId());
             return ResponseEntity.status(HttpStatus.OK).build();
         } catch (PartyNotFoundException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Party connected with this device id does not exist");
