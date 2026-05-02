@@ -20,7 +20,11 @@ public class SpotifyAuthorizedClientService {
 
     public OAuth2AuthorizedClient getAuthorizedClient(UserData user, Authentication authentication) {
         if (user == null || authentication == null) {
-            throw new SpotifyAuthenticationException("No user session available");
+            return null;
+        }
+
+        if (!user.isSpotifyAuthenticated()) {
+            return null;
         }
 
         String registrationId = user.isHasHostPermissions() ? "spotify-host" : "spotify";

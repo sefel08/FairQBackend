@@ -78,7 +78,7 @@ public class PartySession {
     public boolean playNext() {
         PartyPlayer player = this.partyPlayer; // thread safe read
         if (partyPlayer == null) return false;
-        return partyPlayer.playNextTrack();
+        return partyPlayer.playNextTrack(false);
     }
 
     public List<Track> getUserQueue(UUID userId) {
@@ -126,6 +126,11 @@ public class PartySession {
         PartyPlayer player = this.partyPlayer; // thread safe read
         if (player == null) return false;
         return player.voteForSkip(userId);
+    }
+    public boolean cancelUserSkipVote(UUID userId) {
+        PartyPlayer player = this.partyPlayer; // thread safe read
+        if (player == null) return false;
+        return player.cancelUserSkipVote(userId);
     }
     public int getTotalUsers() {
         synchronized (userMapLock) {

@@ -39,11 +39,13 @@ public class AuthController {
         status.put("imageUrl", user.getImageUrl());
         status.put("smallImageUrl", user.getSmallImageUrl());
 
+        OAuth2AuthorizedClient authorizedClient = spotifyAuthorizedClientService.getAuthorizedClient(user, authentication);
         String spotifyUserToken = null;
-        if (authentication != null && authentication.getName() != null) {
-            OAuth2AuthorizedClient authorizedClient = spotifyAuthorizedClientService.getAuthorizedClient(user, authentication);
-            if (authorizedClient != null)
-                spotifyUserToken = authorizedClient.getAccessToken().getTokenValue();
+        if (authorizedClient != null) {
+            spotifyUserToken = authorizedClient.getAccessToken().getTokenValue();
+        } else if (user.isSpotifyAuthenticated()) {
+            // user should have token but has nott, probably session expired or something, needs to reauthenticate
+            status.put("needsReauth", true);
         }
         status.put("spotifyUserToken", spotifyUserToken);
 

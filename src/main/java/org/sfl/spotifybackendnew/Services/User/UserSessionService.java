@@ -2,6 +2,7 @@ package org.sfl.spotifybackendnew.Services.User;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.Part;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
@@ -13,6 +14,10 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.client.InMemoryOAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.session.HttpSessionDestroyedEvent;
@@ -31,13 +36,17 @@ public class UserSessionService {
 
     private final JsonMapper mapper;
     private final PartyService partyService;
+    private final OAuth2AuthorizedClientService authorizedClientService;
 
-    public UserSessionService(JsonMapper mapper, PartyService partyService) {
+    public UserSessionService(JsonMapper mapper, PartyService partyService, OAuth2AuthorizedClientService authorizedClientService) {
         this.mapper = mapper;
         this.partyService = partyService;
+        this.authorizedClientService = authorizedClientService;
     }
 
     public void initializeSessionForGuest(HttpServletRequest request, HttpServletResponse response, String displayName) {
+        HttpSession session = request.getSession(true);
+
         UserData userData = new UserData(
                 UUID.randomUUID(),
                 displayName,
@@ -49,8 +58,6 @@ public class UserSessionService {
                 null,
                 null
         );
-
-        log.info("Initialized session for guest user {} with id: {}", displayName, userData.getUserId());
 
         UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                 userData,
@@ -64,6 +71,9 @@ public class UserSessionService {
 
         HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
         repo.saveContext(context, request, response);
+
+        session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
+        log.info("Initialized session for guest user {} with id: {}", displayName, userData.getUserId());
     }
     public void initializeSessionAfterSpotifyLogin(Authentication authentication, HttpServletRequest request, HttpServletResponse response, UUID oldUserId, String oldPartyId) {
         if (authentication == null || !(authentication.getPrincipal() instanceof OAuth2User oauthUser)) {
@@ -122,6 +132,17 @@ public class UserSessionService {
                 authentication.getCredentials(),
                 List.of(new SimpleGrantedAuthority("ROLE_SPOTIFY_USER"))
         );
+
+        OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
+                ((OAuth2AuthenticationToken) authentication).getAuthorizedClientRegistrationId(),
+                authentication.getName()
+        );
+        if (client != null) {
+            authorizedClientService.saveAuthorizedClient(client, newAuth);
+            log.info("Successfully re-mapped Spotify tokens to the new UserData principal");
+        } else {
+            log.warn("Could not find OAuth2 client for {}, tokens might be lost!", authentication.getName());
+        }
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(newAuth);

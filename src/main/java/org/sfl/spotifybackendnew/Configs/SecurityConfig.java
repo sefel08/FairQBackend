@@ -1,16 +1,22 @@
 package org.sfl.spotifybackendnew.Configs;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.Services.User.UserSessionService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.savedrequest.NullRequestCache;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
 import org.springframework.web.cors.CorsConfiguration;
 
@@ -35,7 +41,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
-
+            .requestCache(RequestCacheConfigurer::disable)
             .cors(cors -> cors.configurationSource(request -> {
                 var config = new CorsConfiguration();
                 config.setAllowedOrigins(List.of("http://127.0.0.1:5173"));
@@ -44,7 +50,6 @@ public class SecurityConfig {
                 config.setAllowCredentials(true);
                 return config;
             }))
-
             .authorizeHttpRequests(auth -> auth
 
                     //logging in and status
@@ -58,15 +63,20 @@ public class SecurityConfig {
 
                     .anyRequest().authenticated()
             )
-
+            .exceptionHandling(ex -> ex
+                    .defaultAuthenticationEntryPointFor(
+                            new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                            PathPatternRequestMatcher.withDefaults().matcher("/api/**")
+                    )
+            )
             .oauth2Login(oauth2 -> oauth2
                     .authorizationEndpoint(sub -> sub
                             .authorizationRequestResolver(new CustomAuthorizationRequestResolver(clientRegistrationRepository))
                     )
                     .successHandler(customSuccessHandler())
                     .failureUrl("http://127.0.0.1:5173")
+                    .loginPage("/login")
             )
-
             .sessionManagement(session -> session
                     .maximumSessions(1)
                     .maxSessionsPreventsLogin(false)

@@ -3,6 +3,7 @@ package org.sfl.spotifybackendnew.DTOs.User;
 import jakarta.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -48,7 +49,8 @@ public class UserData implements UserDetails {
     }
 
     // necessary overrides for UserDetails
-    @Override public String getUsername() { return spotifyId; }
+    @Override @NullMarked
+    public String getUsername() { return userId.toString(); }
     @Override public String getPassword() { return null; }
     @Override public Collection<? extends GrantedAuthority> getAuthorities() { return null; }
     @Override public boolean isAccountNonExpired() { return true; }

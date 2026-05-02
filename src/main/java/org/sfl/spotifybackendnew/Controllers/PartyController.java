@@ -105,4 +105,16 @@ public class PartyController {
             return false;
         }
     }
+    @DeleteMapping("/skip")
+    public boolean cancelSkipVote(@AuthenticationPrincipal UserData user) {
+        if (user.getPartyId() == null)
+            return false;
+
+        try {
+            return partyService.cancelUserSkipVote(user.getPartyId(), user.getUserId());
+        } catch (PartyNotFoundException e) {
+            log.error("Party not found for user {} when canceling his skip", user.getUserId());
+            return false;
+        }
+    }
 }
