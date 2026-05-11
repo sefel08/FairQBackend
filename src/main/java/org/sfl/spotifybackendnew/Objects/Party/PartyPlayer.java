@@ -55,12 +55,6 @@ public class PartyPlayer {
         this.messagingService = messagingService;
         this.partySession = partySession;
         this.partyId = partySession.getPartyId();
-
-        // transfer playback to the new player device
-//        spotifyPlayerService.setupPlayer(
-//                spotifyAuthorizedClientService.getAuthorizedClient(playerUser, playerAuthentication),
-//                deviceId
-//        );
     }
 
     public synchronized boolean playNextTrack(boolean forceSkip) {
@@ -137,22 +131,31 @@ public class PartyPlayer {
     }
 
     private boolean handleSkipping() {
-        int totalUsers = partySession.getTotalUsers();
-        int voteCount = skipVotes.size();
         PartySettings settings = partySession.getPartySettings();
-
         if (!settings.voteToSkip()) return false;
 
-        // if percent voting is enabled, calculate the threshold based on total users, otherwise use the fixed threshold
-        boolean shouldSkip = voteCount > ((settings.percentVoting()) ? totalUsers * settings.voteThreshold() : settings.voteThreshold());
+        int voteCount = skipVotes.size();
+        boolean shouldSkip = isSkip(settings, voteCount);
 
         if (shouldSkip) {
             playNextTrack(true);
             skipVotes.clear();
-            log.info("Track skipped in party {} with {} skip votes out of {} users", partyId, voteCount, totalUsers);
+            log.info("Track skipped in party {} with {} skip votes", partyId, voteCount);
             return true;
         }
 
         return false;
+    }
+    private boolean isSkip(PartySettings settings, int voteCount) {
+        boolean shouldSkip;
+
+        if (settings.percentVoting()) {
+            int totalUsers = partySession.getTotalUsers();
+            int percentVotesThreshold = (int) (totalUsers * settings.voteThreshold());
+            shouldSkip = settings.moreThanThreshold() ? voteCount > percentVotesThreshold : voteCount >= percentVotesThreshold;
+        } else { // if not percent voting, there must be moreThanThreshold votes than threshold to skip
+            shouldSkip = settings.moreThanThreshold() ? voteCount > settings.voteThreshold() : voteCount >= settings.voteThreshold();
+        }
+        return shouldSkip;
     }
 }

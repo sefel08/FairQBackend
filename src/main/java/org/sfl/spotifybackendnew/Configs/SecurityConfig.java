@@ -76,7 +76,10 @@ public class SecurityConfig {
                             .authorizationRequestResolver(new CustomAuthorizationRequestResolver(clientRegistrationRepository))
                     )
                     .successHandler(customSuccessHandler())
-                    .failureUrl("http://127.0.0.1:5173")
+                    .failureHandler((request, response, exception) -> {
+                        log.error("OAuth2 login failed: ", exception);
+                        response.sendRedirect("http://127.0.0.1:5173?loginError=" + exception.getMessage());
+                    })
                     .loginPage("/login")
             )
             .sessionManagement(session -> session
