@@ -56,6 +56,28 @@ public class PartyController {
             return new SimpleResponse(false, "Party ID is required");
         return partyService.joinParty(partyId, user, joinPartyRequest.asParticipant, joinPartyRequest.asPlayer, joinPartyRequest.asHost);
     }
+    @PostMapping("/joinOwn")
+    public SimpleResponse joinOwnParty(@AuthenticationPrincipal UserData user, @RequestBody JoinPartyRequest joinPartyRequest) {
+        if (user.getSpotifyId() == null)
+            return new SimpleResponse(false, "You must be logged in via Spotify");
+        return partyService.joinParty(user.getSpotifyId(), user, joinPartyRequest.asParticipant, joinPartyRequest.asPlayer, joinPartyRequest.asHost);
+    }
+
+    @PostMapping("/leave")
+    public SimpleResponse leaveParty(@AuthenticationPrincipal UserData user) {
+        if (user.getPartyId() == null)
+            return new SimpleResponse(false, "You are not in a party");
+
+        try {
+            log.info("User {} is leaving party {}", user.getUserId(), user.getPartyId());
+            partyService.removeUserFromParty(user.getPartyId(), user.getUserId());
+            user.setPartyId(null);
+            return new SimpleResponse(true, "Left the party successfully");
+        } catch (PartyNotFoundException e) {
+            log.error("Party not found for user {} when trying to leave", user.getUserId());
+            return new SimpleResponse(false, "Party not found");
+        }
+    }
 
     public record AddTrackRequest(String trackId) {}
     public record DeleteTrackRequest(int index) {}
