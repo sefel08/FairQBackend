@@ -1,5 +1,6 @@
 package org.sfl.spotifybackendnew.Objects.SmartQueue;
 
+import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
@@ -14,8 +15,9 @@ public class SmartQueue {
     private final Map<UUID, PartyUser> userMap;
     private final CopyOnWriteArrayList<UUID> joinOrder;
 
-    private UUID lastPlayingUserId = null;
-    private int lastPlayingIndex = 0;
+    @Getter
+    private UUID currentlyPlayingUserId = null;
+    private int currentlyPlayingIndex = 0;
 
     // only for displaying whole queue
     private final AtomicReference<List<AddedTrack>> cachedQueue = new AtomicReference<>(new ArrayList<>());
@@ -43,8 +45,8 @@ public class SmartQueue {
             if (currentUser != null) {
                 List<Track> currentUserQueue = currentUser.getQueue();
                 if (!currentUserQueue.isEmpty()) {
-                    lastPlayingUserId = userId;
-                    lastPlayingIndex = currentPlayingUserIndex;
+                    currentlyPlayingUserId = userId;
+                    currentlyPlayingIndex = currentPlayingUserIndex;
                     return currentUser.removeTrack(0);
                 }
             }
@@ -54,7 +56,7 @@ public class SmartQueue {
 
         return null;
     }
-    public Track peekTrack() {
+    public AddedTrack peekTrack() {
         int size = joinOrder.size();
         if (size == 0) return null;
 
@@ -68,7 +70,7 @@ public class SmartQueue {
             if (currentUser != null) {
                 List<Track> currentUserQueue = currentUser.getQueue();
                 if (!currentUserQueue.isEmpty()) {
-                    return currentUserQueue.getFirst();
+                    return new AddedTrack(currentUserQueue.getFirst(), currentUser.getProfile());
                 }
             }
 
@@ -121,12 +123,12 @@ public class SmartQueue {
         int size = joinOrder.size();
         if (size == 0) return 0;
         int currentPlayingUserIndex = 0;
-        if (lastPlayingUserId != null) {
-            int actualIndexInList = joinOrder.indexOf(lastPlayingUserId);
+        if (currentlyPlayingUserId != null) {
+            int actualIndexInList = joinOrder.indexOf(currentlyPlayingUserId);
             if (actualIndexInList != -1) {
                 currentPlayingUserIndex = (actualIndexInList + 1) % size;
             } else {
-                currentPlayingUserIndex = lastPlayingIndex % size;
+                currentPlayingUserIndex = currentlyPlayingIndex % size;
             }
         }
         return currentPlayingUserIndex;

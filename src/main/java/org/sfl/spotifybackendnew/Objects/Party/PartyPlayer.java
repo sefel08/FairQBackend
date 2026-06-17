@@ -1,7 +1,9 @@
 package org.sfl.spotifybackendnew.Objects.Party;
 
+import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.DTOs.Party.Message;
 import org.sfl.spotifybackendnew.DTOs.Party.PartySettings;
@@ -29,6 +31,8 @@ public class PartyPlayer {
 
     @Setter
     private SmartQueue partyQueue;
+    @Getter
+    private AddedTrack currentlyPlaying;
     private final AtomicBoolean waitsForNewTrack = new AtomicBoolean(false);
     private final Set<UUID> skipVotes = new HashSet<>();
 
@@ -57,13 +61,14 @@ public class PartyPlayer {
     }
 
     public synchronized boolean playNextTrack(boolean forceSkip) {
-        Track nextTrack = partyQueue.peekTrack();
+        AddedTrack nextAddedTrack = partyQueue.peekTrack();
+        Track nextTrack = nextAddedTrack != null ? nextAddedTrack.track() : null;
 
         // if party queue is empty
         if (nextTrack == null) {
+            currentlyPlaying = null;
             waitsForNewTrack.set(true);
             log.info("Party player in party {} is waiting for new track", partyId);
-
             if (forceSkip) {
                 // play 1 second of silence
                 nextTrack = new Track(
@@ -76,6 +81,9 @@ public class PartyPlayer {
                         "spotify:track:4jaXxB0DJ6X4PdjMK8XVfu"
                 );
             } else {
+                skipVotes.clear();
+                messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
+                messagingService.sendUpdate(partyId, new Message(MessageType.SKIP_VOTES_CHANGED, skipVotes.size()));
                 return false;
             }
         }
@@ -94,6 +102,7 @@ public class PartyPlayer {
         );
 
         if (success) {
+            currentlyPlaying = nextAddedTrack;
             partyQueue.pollTrack();
             skipVotes.clear();
             waitsForNewTrack.set(false);
@@ -114,6 +123,8 @@ public class PartyPlayer {
     public synchronized int voteForSkip(UUID userId) {
         if (waitsForNewTrack.get()) return 0; // cannot skip if waiting for new track
 
+
+
         if (skipVotes.add(userId)) {
             log.info("User {} voted to skip the current track in party {}", userId, partyId);
         } else {
@@ -121,7 +132,7 @@ public class PartyPlayer {
             return 0;
         }
 
-        boolean skipped = handleSkipping();
+        boolean skipped = handleSkipping(userId);
         messagingService.sendUpdate(partyId, new Message(MessageType.SKIP_VOTES_CHANGED, skipVotes.size()));
         return skipped ? -1 : 1;
     }
@@ -145,12 +156,20 @@ public class PartyPlayer {
         messagingService.sendPrivateUpdate(playerUserSession.getUserId(), MessageType.REFRESH_STATUS);
     }
 
-    private boolean handleSkipping() {
+    private boolean handleSkipping(UUID votingUserId) {
         PartySettings settings = partySession.getPartySettings();
         if (!settings.voteToSkip()) return false;
 
+        boolean shouldSkip;
         int voteCount = skipVotes.size();
-        boolean shouldSkip = isSkip(settings, voteCount);
+
+        if (settings.instantSelfSkip() && partyQueue.getCurrentlyPlayingUserId() == votingUserId) {
+            // user want to skip his track and instantSelfSkip is on
+            shouldSkip = true;
+        } else {
+            // normal skipping
+            shouldSkip = fulfillThreshold(settings, voteCount);
+        }
 
         if (shouldSkip) {
             playNextTrack(true);
@@ -161,7 +180,7 @@ public class PartyPlayer {
 
         return false;
     }
-    private boolean isSkip(PartySettings settings, int voteCount) {
+    private boolean fulfillThreshold(PartySettings settings, int voteCount) {
         boolean shouldSkip;
 
         if (settings.percentVoting()) {

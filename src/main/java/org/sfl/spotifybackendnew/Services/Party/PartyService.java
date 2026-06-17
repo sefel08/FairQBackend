@@ -3,6 +3,7 @@ package org.sfl.spotifybackendnew.Services.Party;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.Party.PartyQueueInfo;
 import org.sfl.spotifybackendnew.DTOs.Party.PartySettings;
 import org.sfl.spotifybackendnew.DTOs.Party.SimpleResponse;
 import org.sfl.spotifybackendnew.DTOs.User.SafeUserProfile;
@@ -16,7 +17,6 @@ import org.sfl.spotifybackendnew.Services.Messages.MessagingService;
 import org.sfl.spotifybackendnew.Services.Security.SpotifyAuthorizedClientService;
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyPlayerService;
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyProxyService;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -43,7 +43,7 @@ public class PartyService {
         if (userPartySession != null) return;
 
         log.info("Creating party for user with spotify id {}", spotifyUserId);
-        log.info("Settings used for creation this party: voteToSkip {}, percentVoting {}, voteThreshold {}", partySettings.voteToSkip(), partySettings.percentVoting(), partySettings.voteThreshold());
+        log.info("Settings used for creation this party: voteToSkip {}, percentVoting {}, voteThreshold {}, instantSelfSkip {}", partySettings.voteToSkip(), partySettings.percentVoting(), partySettings.voteThreshold(), partySettings.instantSelfSkip());
 
         //create new party for user
         PartySession party = new PartySession(spotifyUserId, partySettings, messagingService);
@@ -181,11 +181,11 @@ public class PartyService {
         party.removeFromUserQueue(userId, index);
     }
 
-    public List<AddedTrack> getPartyQueue(String partyId) {
+    public PartyQueueInfo getPartyQueueInfo(String partyId) {
         validatePartyId(partyId);
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
-        return party.getPartyQueue();
+        return new PartyQueueInfo(party.getPartyQueue(), party.getCurrentlyPlaying());
     }
 
     public List<SafeUserProfile> getPartyUsers(String partyId) {

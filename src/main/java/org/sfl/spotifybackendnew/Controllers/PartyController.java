@@ -3,10 +3,10 @@ package org.sfl.spotifybackendnew.Controllers;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.Party.PartyQueueInfo;
 import org.sfl.spotifybackendnew.DTOs.Party.PartySettings;
 import org.sfl.spotifybackendnew.DTOs.Party.SimpleResponse;
 import org.sfl.spotifybackendnew.DTOs.User.SafeUserProfile;
-import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Exceptions.PartyNotFoundException;
 import org.sfl.spotifybackendnew.Services.Party.PartyService;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Slf4j
 @RestController
@@ -105,11 +104,11 @@ public class PartyController {
     }
 
     @GetMapping("/partyQueue")
-    public List<AddedTrack> getPartyQueue(@AuthenticationPrincipal UserData user) {
+    public PartyQueueInfo getPartyQueue(@AuthenticationPrincipal UserData user) {
         if (user.getPartyId() == null) {
-            return List.of();
+            return new PartyQueueInfo(List.of(), null);
         }
-        return partyService.getPartyQueue(user.getPartyId());
+        return partyService.getPartyQueueInfo(user.getPartyId());
     }
 
     @GetMapping("/users")

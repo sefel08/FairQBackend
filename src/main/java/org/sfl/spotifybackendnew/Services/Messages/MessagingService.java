@@ -16,9 +16,11 @@ public class MessagingService {
     private final SimpMessagingTemplate messagingTemplate;
 
     public void sendUpdate(String partyId, MessageType messageType) {
+//        log.info("Sending message: {}", messageType.toString());
         messagingTemplate.convertAndSend("/party/" + partyId, new Message(messageType, null));
     }
     public void sendUpdate(String partyId, Message message) {
+//        log.info("Sending message: {} with payload: {}", message.type().toString(), message.payload().toString());
         messagingTemplate.convertAndSend("/party/" + partyId, message);
     }
     public void sendPrivateUpdate(UUID userId, MessageType messageType) {

@@ -103,8 +103,8 @@ public class PartySession {
 
     public boolean playNext() {
         PartyPlayer player = this.partyPlayer; // thread safe read
-        if (partyPlayer == null) return false;
-        return partyPlayer.playNextTrack(false);
+        if (player == null) return false;
+        return player.playNextTrack(false);
     }
 
     public List<Track> getUserQueue(UUID userId) {
@@ -129,11 +129,15 @@ public class PartySession {
         PartyUser user = getPartyUser(userId);
         if (user != null) {
             user.removeTrack(index);
+            messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
         }
     }
 
     public List<AddedTrack> getPartyQueue() {
         return queue.getQueue();
+    }
+    public AddedTrack getCurrentlyPlaying() {
+        return partyPlayer.getCurrentlyPlaying();
     }
     public List<UserProfile> getPartyUsers() {
         List<UserProfile> users = new ArrayList<>(joinOrder.size());
