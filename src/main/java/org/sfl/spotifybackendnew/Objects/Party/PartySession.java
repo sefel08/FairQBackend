@@ -10,32 +10,61 @@ import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 import org.sfl.spotifybackendnew.Enums.MessageType;
 import org.sfl.spotifybackendnew.Objects.SmartQueue.SmartQueue;
 import org.sfl.spotifybackendnew.Services.Messages.MessagingService;
+import org.sfl.spotifybackendnew.Services.Spotify.SpotifyProxyService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Slf4j
 public class PartySession {
     @Getter
     private final String partyId;
     @Getter
+    private final UserProfile ownerProfile;
+    @Getter
     private PartySettings partySettings;
 
     private final Map<UUID, PartyUser> userMap = new ConcurrentHashMap<>();
     private final CopyOnWriteArrayList<UUID> joinOrder = new CopyOnWriteArrayList<>();
 
+    @Getter
+    private int totalFallbackTracks;
+    private int fallbackIndex = 0;
+    private final List<Integer> fallbackTrackIds;
+    private final AtomicReference<CompletableFuture<Track>> cachedFallbackTrackFuture = new AtomicReference<>();
+
     private final SmartQueue queue = new SmartQueue(userMap, joinOrder);
     private PartyPlayer partyPlayer;
 
     private final MessagingService messagingService;
+    private final SpotifyProxyService spotifyProxyService;
 
     private final Object userMapLock = new Object();
 
-    public PartySession(String partyId, PartySettings partySettings, MessagingService messagingService) {
-        this.partyId = partyId;
+    public PartySession(UserData owner, String userToken, PartySettings partySettings, int totalFallbackPlaylistTracks, MessagingService messagingService, SpotifyProxyService spotifyProxyService) {
+        this.partyId = owner.getSpotifyId();
+        this.ownerProfile = new UserProfile(owner.getDisplayName(), owner.isSpotifyAuthenticated(), owner.getSpotifyId(), owner.getImageUrl(), owner.getSmallImageUrl());
         this.partySettings = partySettings;
+        this.totalFallbackTracks = totalFallbackPlaylistTracks;
         this.messagingService = messagingService;
+        this.spotifyProxyService = spotifyProxyService;
+
+        // fallback playlist initialization
+        if (totalFallbackTracks != -1) {
+            //create random order of ids
+            fallbackTrackIds = new ArrayList<>(totalFallbackPlaylistTracks);
+            for (int i = 0; i < totalFallbackTracks; i++) {
+                fallbackTrackIds.add(i);
+            }
+            Collections.shuffle(fallbackTrackIds);
+        } else  {
+            fallbackTrackIds = Collections.emptyList();
+        }
+        triggerFallbackTrackReplenishment(userToken);
     }
 
     public void addUser(UserProfile profile, UserData user) {
@@ -62,6 +91,7 @@ public class PartySession {
             if (partyPlayer != null && partyPlayer.getPlayerId().equals(userId)) {
                 log.info("Player {} left the party, clearing player", userId);
                 clearPlayer();
+                messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
             }
             if (userMap.remove(userId) != null) {
                 joinOrder.remove(userId);
@@ -138,6 +168,7 @@ public class PartySession {
         return queue.getQueue();
     }
     public AddedTrack getCurrentlyPlaying() {
+        if (partyPlayer == null) return null;
         return partyPlayer.getCurrentlyPlaying();
     }
     public List<UserProfile> getPartyUsers() {
@@ -169,6 +200,57 @@ public class PartySession {
         }
     }
 
+    // method for PartyPlayer
+    public AddedTrack pollFallbackTrack(String token) {
+        log.info("Polling fallback track with total tracks {}", totalFallbackTracks);
+
+        if (totalFallbackTracks == -1) return null;
+
+        CompletableFuture<Track> fallbackTrackFuture = cachedFallbackTrackFuture.getAndSet(null);
+        triggerFallbackTrackReplenishment(token);
+
+        try {
+            Track fallbackTrack = fallbackTrackFuture.join();
+            if (fallbackTrack == null) return null;
+            return new AddedTrack(fallbackTrack, ownerProfile);
+        } catch (Exception e) {
+            log.error("Error while grabbing fallback track from future", e);
+            return null;
+        }
+    }
+
+    private void incrementFallbackIndex() {
+        fallbackIndex++;
+        if (fallbackIndex >= totalFallbackTracks) {
+            int lastIndex = fallbackTrackIds.get(totalFallbackTracks - 1);
+            fallbackIndex = 0;
+            log.info("Shuffling fallback track IDs");
+            Collections.shuffle(fallbackTrackIds);
+            if (totalFallbackTracks > 1 && fallbackTrackIds.getFirst() == lastIndex) {
+                int element = fallbackTrackIds.removeFirst();
+                fallbackTrackIds.add(element);
+            }
+        }
+    }
+    private void triggerFallbackTrackReplenishment(String token) {
+        int nextTrackIndex = fallbackTrackIds.get(fallbackIndex);
+        incrementFallbackIndex();
+
+        CompletableFuture<Track> nextFuture = CompletableFuture.supplyAsync(() -> {
+            try {
+                Track fallbackTrack = spotifyProxyService.getPlaylistTrack(token, partySettings.fallbackPlaylistId(), nextTrackIndex);
+                if (fallbackTrack == null) {
+                    log.warn("Failed to fetch fallback track at index {} from playlist {}, skipping to next", nextTrackIndex, partySettings.fallbackPlaylistId());
+                }
+                return fallbackTrack;
+            } catch (Exception e) {
+                log.error("Error while replenishing fallback track", e);
+                return null;
+            }
+        });
+
+        cachedFallbackTrackFuture.set(nextFuture);
+    }
     private PartyUser getPartyUser(UUID userId) {
         return userMap.get(userId);
     }

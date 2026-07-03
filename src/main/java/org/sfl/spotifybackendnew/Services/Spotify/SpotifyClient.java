@@ -1,15 +1,13 @@
 package org.sfl.spotifybackendnew.Services.Spotify;
 
 import jakarta.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.Exceptions.SpotifyClientException;
 import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifyGetUserPlaylistsResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifySearchResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.SpotifyWrappersDTOs.SpotifyTrackWrapper;
 import org.sfl.spotifybackendnew.SpotifyDTOs.SubDTOs.*;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -21,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+@Slf4j
 @Component
 public class SpotifyClient {
 
@@ -84,6 +83,32 @@ public class SpotifyClient {
             throw new SpotifyClientException("Failed to fetch playlist data: " + e.getMessage(), e);
         }
     }
+    public SpotifyTrack getPlaylistItem(String accessToken, String playlistId, int index) {
+        try {
+            UriComponentsBuilder urlBuilder = UriComponentsBuilder.fromUriString(BASE_URL + "/playlists/" + playlistId + "/items")
+                    .queryParam("limit", 1)
+                    .queryParam("offset", index);
+
+            String url = urlBuilder.build().toUriString();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            JsonNode json = Objects.requireNonNull(restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    JsonNode.class
+            ).getBody());
+
+            List<SpotifyTrackWrapper> spotifyTracksWrapped = jsonMapper.readerForListOf(SpotifyTrackWrapper.class).readValue(json.get("items"));
+            return spotifyTracksWrapped.getFirst().getTrack();
+
+        } catch (Exception e) {
+            throw new SpotifyClientException("Failed to fetch playlist data: " + e.getMessage(), e);
+        }
+    }
     public SpotifySearchResponse search(String query) {
         try {
             String url = UriComponentsBuilder.fromUriString(BASE_URL + "/search")
@@ -136,21 +161,32 @@ public class SpotifyClient {
             throw new SpotifyClientException("Failed to fetch track: " + e.getMessage(), e);
         }
     }
-    public boolean isValidPlaylist(String playlistId) {
+    public int getPlaylistTotalTracks(String accessToken, String playlistId) {
         try {
-            String url = "https://api.spotify.com/v1/playlists/" + playlistId + "?fields=id";
+            String url = BASE_URL + "/playlists/" + playlistId + "?fields=items(total)";
 
             HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(spotifyTokenService.getApplicationToken());
+            headers.setBearerAuth(accessToken);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-            restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            return true;
+            ResponseEntity<JsonNode> response = restTemplate.exchange(url, HttpMethod.GET, entity, JsonNode.class);
 
-        } catch (HttpClientErrorException.NotFound e) {
-            return false; // 404 playlist does not exist
+            JsonNode json = response.getBody();
+
+            if (json == null) {
+                log.warn("Total tracks for playlist body is null");
+                return -1;
+            }
+
+            if (!json.has("items") || !json.get("items").has("total")) {
+                log.warn("Failed to extract total track count for playlist {}: Invalid response format. JSON: {}", playlistId, json);
+                return -1;
+            }
+
+            return json.get("items").get("total").asInt();
+
         } catch (Exception e) {
-            throw new SpotifyClientException("Failed checking if playlist is valid: " + e.getMessage(), e);
+            throw new SpotifyClientException("Failed getting total number of tracks in playlist: " + e.getMessage(), e);
         }
     }
 

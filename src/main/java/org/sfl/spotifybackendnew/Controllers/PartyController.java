@@ -46,7 +46,7 @@ public class PartyController {
 
     @PostMapping
     public String createParty(@AuthenticationPrincipal UserData user, @RequestBody PartySettings partySettings) {
-        partyService.createParty(user.getSpotifyId(), partySettings);
+        partyService.createParty(user, partySettings);
         return user.getSpotifyId();
     }
     @PostMapping("/join")

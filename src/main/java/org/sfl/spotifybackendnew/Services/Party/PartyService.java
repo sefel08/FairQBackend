@@ -17,6 +17,7 @@ import org.sfl.spotifybackendnew.Services.Messages.MessagingService;
 import org.sfl.spotifybackendnew.Services.Security.SpotifyAuthorizedClientService;
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyPlayerService;
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyProxyService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -28,26 +29,37 @@ public class PartyService {
 
     private final SpotifyProxyService spotifyProxyService;
     private final MessagingService messagingService;
+    private final SpotifyAuthorizedClientService spotifyAuthorizedClientService;
 
     // (spotifyId - party) map
     private final Map<String, PartySession> partySessionMap = new ConcurrentHashMap<>();
 
-    public PartyService(SpotifyProxyService spotifyProxyService, MessagingService messagingService) {
+    public PartyService(SpotifyProxyService spotifyProxyService, MessagingService messagingService, SpotifyAuthorizedClientService spotifyAuthorizedClientService) {
         this.spotifyProxyService = spotifyProxyService;
         this.messagingService = messagingService;
+        this.spotifyAuthorizedClientService = spotifyAuthorizedClientService;
     }
 
 
-    public void createParty(String spotifyUserId, PartySettings partySettings) {
-        PartySession userPartySession = partySessionMap.get(spotifyUserId);
-        if (userPartySession != null) return;
+    public void createParty(UserData user, PartySettings partySettings) {
+        String spotifyUserId = user.getSpotifyId();
+
+        // get playlist total tracks
+        int totalTracks = -1;
+        if (partySettings.fallbackPlaylistId() != null) {
+            OAuth2AuthorizedClient authorizedClient = spotifyAuthorizedClientService.getAuthorizedClient(user);
+            totalTracks = spotifyProxyService.getTotalNumberOfTracksInPlaylist(authorizedClient, partySettings.fallbackPlaylistId());
+        }
 
         log.info("Creating party for user with spotify id {}", spotifyUserId);
-        log.info("Settings used for creation this party: voteToSkip {}, percentVoting {}, voteThreshold {}, instantSelfSkip {}", partySettings.voteToSkip(), partySettings.percentVoting(), partySettings.voteThreshold(), partySettings.instantSelfSkip());
+        log.info("Settings used for creation this party: voteToSkip {}, percentVoting {}, voteThreshold {}, instantSelfSkip {}, fallbackPlaylistId {}", partySettings.voteToSkip(), partySettings.percentVoting(), partySettings.voteThreshold(), partySettings.instantSelfSkip(), partySettings.fallbackPlaylistId());
+
+        String userToken = spotifyAuthorizedClientService.getAuthorizedClient(user).getAccessToken().getTokenValue();
 
         //create new party for user
-        PartySession party = new PartySession(spotifyUserId, partySettings, messagingService);
+        PartySession party = new PartySession(user, userToken, partySettings, totalTracks, messagingService, spotifyProxyService);
         partySessionMap.put(spotifyUserId, party);
+        user.setPartyId(spotifyUserId);
     }
 
     public SimpleResponse joinParty(String partyId, UserData user, boolean asParticipant, boolean asPlayer, boolean asHost) {

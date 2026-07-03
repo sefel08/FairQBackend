@@ -61,56 +61,63 @@ public class PartyPlayer {
     }
 
     public synchronized boolean playNextTrack(boolean forceSkip) {
+        // Poll from queue
         AddedTrack nextAddedTrack = partyQueue.peekTrack();
-        Track nextTrack = nextAddedTrack != null ? nextAddedTrack.track() : null;
-
-        // if party queue is empty
-        if (nextTrack == null) {
-            currentlyPlaying = null;
-            waitsForNewTrack.set(true);
-            log.info("Party player in party {} is waiting for new track", partyId);
-            if (forceSkip) {
-                // play 1 second of silence
-                nextTrack = new Track(
-                        "4jaXxB0DJ6X4PdjMK8XVfu",
-                        "",
-                        List.of(),
-                        "",
-                        0,
-                        "https://open.spotify.com/track/4jaXxB0DJ6X4PdjMK8XVfu",
-                        "spotify:track:4jaXxB0DJ6X4PdjMK8XVfu"
-                );
-            } else {
-                skipVotes.clear();
-                messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
-                messagingService.sendUpdate(partyId, new Message(MessageType.SKIP_VOTES_CHANGED, skipVotes.size()));
-                return false;
-            }
+        boolean forceSkipped = false;
+        boolean success = false;
+        boolean noTrackFound = false;
+        // Next poll from fallback playlist
+        if (nextAddedTrack == null && partySession.getPartySettings().fallbackPlaylistId() != null) {
+            nextAddedTrack = partySession.pollFallbackTrack(getFreshToken());
+        }
+        // If force to skip play 1 second of silence to instantly end current track
+        if (nextAddedTrack == null && forceSkip) {
+            forceSkipped = true;
+            nextAddedTrack = new AddedTrack(new Track(
+                    "4jaXxB0DJ6X4PdjMK8XVfu",
+                    "",
+                    List.of(),
+                    "",
+                    0,
+                    "https://open.spotify.com/track/4jaXxB0DJ6X4PdjMK8XVfu",
+                    "spotify:track:4jaXxB0DJ6X4PdjMK8XVfu"
+            ), null);
         }
 
-        String newToken = spotifyAuthorizedClientService.getAuthorizedClient(playerUserSession).getAccessToken().getTokenValue();
-        if (!newToken.equals(userToken)) {
-            log.info("Detected token refresh for player in party {}, updating token", partyId);
-            userToken = newToken;
-            messagingService.sendPrivateUpdate(playerUserSession.getUserId(), MessageType.REFRESH_TOKEN);
-        }
-
-        boolean success = spotifyPlayerService.playTrack(
-                userToken,
-                nextTrack.getUri(),
-                deviceId
-        );
-
-        if (success) {
-            currentlyPlaying = nextAddedTrack;
-            partyQueue.pollTrack();
-            skipVotes.clear();
-            waitsForNewTrack.set(false);
-            messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
-            messagingService.sendUpdate(partyId, new Message(MessageType.SKIP_VOTES_CHANGED, skipVotes.size()));
-            return true;
+        if (nextAddedTrack != null) {
+            // We have a track to play
+            success = spotifyPlayerService.playTrack(
+                    getFreshToken(),
+                    nextAddedTrack.track().getUri(),
+                    deviceId
+            );
         } else {
-            log.warn("Failed to play track for party {}. Player device might be offline.", partyId);
+            noTrackFound = true;
+        }
+
+        if (forceSkipped) { // skipped to silence
+            log.info("Skipped to silence in party {}", partyId);
+            currentlyPlaying = null;
+            messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
+            waitsForNewTrack.set(true);
+            return true;
+        } else if (success) { // played new track
+            log.info("Successfully played track {}", nextAddedTrack.track().getUri());
+            currentlyPlaying = nextAddedTrack;
+            messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
+            waitsForNewTrack.set(false);
+            partyQueue.pollTrack();
+            return true;
+        } else if (noTrackFound) { // last track ended
+            log.info("No track found to play next. Waiting for new track");
+            currentlyPlaying = null;
+            messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
+            waitsForNewTrack.set(true);
+            return true;
+        } else { // something went wrong. Probably we couldn't play next track.
+            log.warn("Failed to play track for party {}. This should not be possible.", partyId);
+            waitsForNewTrack.set(true);
+            currentlyPlaying = null;
             return false;
         }
     }
@@ -123,8 +130,6 @@ public class PartyPlayer {
     public synchronized int voteForSkip(UUID userId) {
         if (waitsForNewTrack.get()) return 0; // cannot skip if waiting for new track
 
-
-
         if (skipVotes.add(userId)) {
             log.info("User {} voted to skip the current track in party {}", userId, partyId);
         } else {
@@ -133,7 +138,8 @@ public class PartyPlayer {
         }
 
         boolean skipped = handleSkipping(userId);
-        messagingService.sendUpdate(partyId, new Message(MessageType.SKIP_VOTES_CHANGED, skipVotes.size()));
+        if (!skipped)
+            messagingService.sendUpdate(partyId, new Message(MessageType.SKIP_VOTES_CHANGED, skipVotes.size()));
         return skipped ? -1 : 1;
     }
     public synchronized int cancelUserSkipVote(UUID userId) {
@@ -174,6 +180,7 @@ public class PartyPlayer {
         if (shouldSkip) {
             playNextTrack(true);
             skipVotes.clear();
+            messagingService.sendUpdate(partyId, new Message(MessageType.SKIP_VOTES_CHANGED, 0));
             log.info("Track skipped in party {} with {} skip votes", partyId, voteCount);
             return true;
         }
@@ -191,5 +198,14 @@ public class PartyPlayer {
             shouldSkip = settings.moreThanThreshold() ? voteCount > settings.voteThreshold() : voteCount >= settings.voteThreshold();
         }
         return shouldSkip;
+    }
+    private String getFreshToken() {
+        String newToken = spotifyAuthorizedClientService.getAuthorizedClient(playerUserSession).getAccessToken().getTokenValue();
+        if (!newToken.equals(userToken)) {
+            log.info("Detected token refresh for player in party {}, updating token", partyId);
+            userToken = newToken;
+            messagingService.sendPrivateUpdate(playerUserSession.getUserId(), MessageType.REFRESH_TOKEN);
+        }
+        return userToken;
     }
 }
