@@ -63,9 +63,11 @@ public class PartyPlayer {
     public synchronized boolean playNextTrack(boolean forceSkip) {
         // Poll from queue
         AddedTrack nextAddedTrack = partyQueue.peekTrack();
+        boolean queueIsEmpty = nextAddedTrack == null;
         boolean forceSkipped = false;
         boolean success = false;
         boolean noTrackFound = false;
+
         // Next poll from fallback playlist
         if (nextAddedTrack == null && partySession.getPartySettings().fallbackPlaylistId() != null) {
             nextAddedTrack = partySession.pollFallbackTrack(getFreshToken());
@@ -106,7 +108,10 @@ public class PartyPlayer {
             currentlyPlaying = nextAddedTrack;
             messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
             waitsForNewTrack.set(false);
-            partyQueue.pollTrack();
+            if (!queueIsEmpty) {
+                UUID userWhoPlayed = partyQueue.pollTrack();
+                messagingService.sendPrivateUpdate(userWhoPlayed, MessageType.REFRESH_QUEUE);
+            }
             return true;
         } else if (noTrackFound) { // last track ended
             log.info("No track found to play next. Waiting for new track");

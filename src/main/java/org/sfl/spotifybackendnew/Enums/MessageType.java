@@ -10,4 +10,5 @@ public enum MessageType {
     // private messages
     REFRESH_STATUS,
     REFRESH_TOKEN,
+    REFRESH_QUEUE,
 }

@@ -32,7 +32,8 @@ public class SmartQueue {
         return cachedQueue.get();
     }
 
-    public Track pollTrack() {
+    // returns userID of the user whose track was removed
+    public UUID pollTrack() {
         int size = joinOrder.size();
         if (size == 0) return null;
 
@@ -47,7 +48,8 @@ public class SmartQueue {
                 if (!currentUserQueue.isEmpty()) {
                     currentlyPlayingUserId = userId;
                     currentlyPlayingIndex = currentPlayingUserIndex;
-                    return currentUser.removeTrack(0);
+                    currentUser.removeTrack(0);
+                    return userId;
                 }
             }
 

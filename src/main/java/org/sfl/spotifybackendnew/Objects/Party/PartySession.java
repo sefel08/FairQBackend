@@ -233,6 +233,7 @@ public class PartySession {
         }
     }
     private void triggerFallbackTrackReplenishment(String token) {
+        if (totalFallbackTracks == -1) return;
         int nextTrackIndex = fallbackTrackIds.get(fallbackIndex);
         incrementFallbackIndex();
 
