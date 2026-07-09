@@ -2,6 +2,7 @@ package org.sfl.spotifybackendnew.DTOs.Party;
 
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 
-import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-public record PartyQueueInfo(List<AddedTrack> queue, AddedTrack currentlyPlaying) {}
+public record PartyQueueInfo(Map<UUID, AddedTrack> queue, AddedTrack currentlyPlaying) {}

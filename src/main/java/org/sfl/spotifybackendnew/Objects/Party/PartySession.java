@@ -74,7 +74,7 @@ public class PartySession {
                 log.info("User {} is already in party with id {}, skipping add", userId, partyId);
                 return;
             }
-            List<Track> oldUserQueue = deleteDuplicateUser(profile, userId);
+            Map<UUID, Track> oldUserQueue = deleteDuplicateUser(profile, userId);
             PartyUser partyUser;
             if (oldUserQueue != null)
                 partyUser = new PartyUser(userId, profile, user, oldUserQueue);
@@ -138,33 +138,35 @@ public class PartySession {
         return player.playNextTrack(false);
     }
 
-    public List<Track> getUserQueue(UUID userId) {
+    public Map<UUID, Track> getUserQueue(UUID userId) {
         PartyUser user = getPartyUser(userId);
         if (user != null) {
             return user.getQueue();
         }
-        return List.of();
+        return Map.of();
     }
     public void addToUserQueue(UUID userId, Track track) {
         PartyUser user = getPartyUser(userId);
         if (user != null) {
             synchronized (this) {
                 user.addTrack(track);
+                queue.partyQueueChanged();
                 if (partyPlayer != null) {
                     partyPlayer.notifyNewTrackAdded();
                 }
             }
         }
     }
-    public void removeFromUserQueue(UUID userId, int index) {
+    public void removeFromUserQueue(UUID userId, UUID queueItemId) {
         PartyUser user = getPartyUser(userId);
         if (user != null) {
-            user.removeTrack(index);
+            user.removeTrack(queueItemId);
+            queue.partyQueueChanged();
             messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
         }
     }
 
-    public List<AddedTrack> getPartyQueue() {
+    public Map<UUID, AddedTrack> getPartyQueue() {
         return queue.getQueue();
     }
     public AddedTrack getCurrentlyPlaying() {
@@ -255,13 +257,13 @@ public class PartySession {
     private PartyUser getPartyUser(UUID userId) {
         return userMap.get(userId);
     }
-    private List<Track> deleteDuplicateUser(UserProfile profile, UUID validUserId) {
+    private Map<UUID, Track> deleteDuplicateUser(UserProfile profile, UUID validUserId) {
         if (profile.spotifyAuthorized()) {
             for (PartyUser user : userMap.values()) {
                 if (user.getId() == validUserId) continue;
                 UserProfile userProfile = user.getProfile();
                 if (userProfile.spotifyAuthorized() && Objects.equals(userProfile.spotifyId(), profile.spotifyId())) {
-                    List<Track> oldQueue = user.getQueue();
+                    Map<UUID, Track> oldQueue = user.getQueue();
                     removeUser(user.getId());
                     UserData userSession = user.getUserSession();
                     userSession.setPartyId(null);

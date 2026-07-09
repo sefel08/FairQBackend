@@ -1,6 +1,7 @@
 package org.sfl.spotifybackendnew.Objects.SmartQueue;
 
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
@@ -9,7 +10,9 @@ import org.sfl.spotifybackendnew.Objects.Party.PartyUser;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
+@Slf4j
 public class SmartQueue {
 
     private final Map<UUID, PartyUser> userMap;
@@ -20,15 +23,19 @@ public class SmartQueue {
     private int currentlyPlayingIndex = 0;
 
     // only for displaying whole queue
-    private final AtomicReference<List<AddedTrack>> cachedQueue = new AtomicReference<>(new ArrayList<>());
+    private final AtomicReference<LinkedHashMap<UUID, AddedTrack>> cachedQueue = new AtomicReference<>(new LinkedHashMap<>());
+    private boolean queueNeedsRecalculation = false;
 
     public SmartQueue(Map<UUID, PartyUser> userMap, CopyOnWriteArrayList<UUID> joinOrder) {
         this.userMap = userMap;
         this.joinOrder = joinOrder;
     }
 
-    public List<AddedTrack> getQueue() {
-        refreshQueue();
+    public Map<UUID, AddedTrack> getQueue() {
+        if (queueNeedsRecalculation) {
+            log.info("Queue needs recalculation, refreshing...");
+            refreshQueue();
+        }
         return cachedQueue.get();
     }
 
@@ -44,11 +51,12 @@ public class SmartQueue {
             PartyUser currentUser = userMap.get(userId);
 
             if (currentUser != null) {
-                List<Track> currentUserQueue = currentUser.getQueue();
+                Map<UUID, Track> currentUserQueue = currentUser.getQueue();
                 if (!currentUserQueue.isEmpty()) {
                     currentlyPlayingUserId = userId;
                     currentlyPlayingIndex = currentPlayingUserIndex;
-                    currentUser.removeTrack(0);
+                    currentUser.removeFirstTrack();
+                    partyQueueChanged();
                     return userId;
                 }
             }
@@ -70,9 +78,9 @@ public class SmartQueue {
             PartyUser currentUser = userMap.get(userId);
 
             if (currentUser != null) {
-                List<Track> currentUserQueue = currentUser.getQueue();
+                LinkedHashMap<UUID, Track> currentUserQueue = currentUser.getQueue();
                 if (!currentUserQueue.isEmpty()) {
-                    return new AddedTrack(currentUserQueue.getFirst(), currentUser.getProfile());
+                    return new AddedTrack(currentUserQueue.pollFirstEntry().getValue(), currentUser.getProfile());
                 }
             }
 
@@ -82,8 +90,12 @@ public class SmartQueue {
         return null;
     }
 
-    record UserTrack(Track track, int index, int userIndex, PartyUser partyUser) {}
-    public void refreshQueue() {
+    public void partyQueueChanged() {
+        queueNeedsRecalculation = true;
+    }
+
+    record UserTrack(Track track, UUID queueItemId, int index, int userIndex, PartyUser partyUser) {}
+    private void refreshQueue() {
         List<UUID> currentOrder = List.copyOf(joinOrder);
         List<UserTrack> allTracks = getAllUserTracks(currentOrder);
 
@@ -92,16 +104,18 @@ public class SmartQueue {
         allTracks.sort(Comparator.comparingInt((UserTrack ut) -> ut.index)
                 .thenComparingInt(ut -> (ut.userIndex < currentPlayingUserIndex) ? currentPlayingUserIndex + ut.userIndex : ut.userIndex - currentPlayingUserIndex));
 
-        // change Tracks to AddedTrack
-        List<AddedTrack> newCalculatedQueue = allTracks.stream()
-                .map(ut -> new AddedTrack(ut.track, ut.partyUser().getProfile()))
-                .toList();
+        // change List to Map with AddedTrack
+        LinkedHashMap<UUID, AddedTrack> newCalculatedQueue = new LinkedHashMap<>();
+        for (UserTrack ut: allTracks) {
+            newCalculatedQueue.put(ut.queueItemId, new AddedTrack(ut.track, ut.partyUser.getProfile()));
+        }
 
         updateCache(newCalculatedQueue);
+        queueNeedsRecalculation = false;
     }
 
-    private void updateCache(List<AddedTrack> newCalculatedQueue) {
-        cachedQueue.set(List.copyOf(newCalculatedQueue));
+    private void updateCache(LinkedHashMap<UUID, AddedTrack> newCalculatedQueue) {
+        cachedQueue.set(newCalculatedQueue);
     }
     private @NonNull List<UserTrack> getAllUserTracks(List<UUID> currentOrder) {
         Map<UUID, Integer> userIndexes = new HashMap<>();
@@ -113,9 +127,11 @@ public class SmartQueue {
         List<UserTrack> allTracks = new ArrayList<>();
         for (PartyUser user : userMap.values()) {
             int userIndex = userIndexes.get(user.getId());
-            List<Track> userQueue = user.getQueue();
-            for (int i = 0; i < userQueue.size(); i++) {
-                allTracks.add(new UserTrack(userQueue.get(i), i, userIndex, user));
+            LinkedHashMap<UUID, Track> userQueue = user.getQueue();
+            int index = 0;
+            for (Map.Entry<UUID, Track> entry : userQueue.entrySet()) {
+                allTracks.add(new UserTrack(entry.getValue(), entry.getKey(), index, userIndex, user));
+                index++;
             }
         }
 

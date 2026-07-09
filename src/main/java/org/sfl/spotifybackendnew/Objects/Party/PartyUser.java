@@ -7,9 +7,7 @@ import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Data
 public class PartyUser {
@@ -20,30 +18,30 @@ public class PartyUser {
     private UserProfile profile;
 
     @Getter(AccessLevel.NONE)
-    private final List<Track> queue = new ArrayList<>();
+    private final LinkedHashMap<UUID, Track> queue = new LinkedHashMap<>();
 
     public PartyUser(UUID userId, UserProfile profile, UserData userSession) {
         id = userId;
         this.profile = profile;
         this.userSession = userSession;
     }
-    public PartyUser(UUID userId, UserProfile profile, UserData userSession,  List<Track> queue) {
+    public PartyUser(UUID userId, UserProfile profile, UserData userSession, Map<UUID, Track> queue) {
         id = userId;
         this.profile = profile;
         this.userSession = userSession;
-        this.queue.addAll(queue);
+        this.queue.putAll(queue);
     }
 
     public synchronized void addTrack(Track track) {
-        queue.add(track);
+        queue.put(UUID.randomUUID(), track);
     }
-    public synchronized Track removeTrack(int index) {
-        if (index >= 0 && index < queue.size()) {
-            return queue.remove(index);
-        }
-        return null;
+    public synchronized void removeTrack(UUID queueItemId) {
+        queue.remove(queueItemId);
     }
-    public synchronized List<Track> getQueue() {
-        return new ArrayList<>(queue);
+    public synchronized void removeFirstTrack() {
+        queue.pollFirstEntry();
+    }
+    public synchronized LinkedHashMap<UUID, Track> getQueue() {
+        return new LinkedHashMap<>(queue);
     }
 }

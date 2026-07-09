@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -80,12 +81,12 @@ public class PartyController {
     }
 
     public record AddTrackRequest(String trackId) {}
-    public record DeleteTrackRequest(int index) {}
+    public record DeleteTrackRequest(UUID queueItemId) {}
 
     @GetMapping("/queue")
-    public List<Track> getQueue(@AuthenticationPrincipal UserData user) {
+    public Map<UUID, Track> getQueue(@AuthenticationPrincipal UserData user) {
         if (user.getPartyId() == null) {
-            return List.of();
+            return Map.of();
         }
         return partyService.getUserQueue(user.getPartyId(), user.getUserId());
     }
@@ -101,13 +102,13 @@ public class PartyController {
         if (user.getPartyId() == null) {
             return;
         }
-        partyService.removeFromUserQueue(user.getPartyId(), user.getUserId(), deleteTrackRequest.index);
+        partyService.removeFromUserQueue(user.getPartyId(), user.getUserId(), deleteTrackRequest.queueItemId);
     }
 
     @GetMapping("/partyQueue")
     public PartyQueueInfo getPartyQueue(@AuthenticationPrincipal UserData user) {
         if (user.getPartyId() == null) {
-            return new PartyQueueInfo(List.of(), null);
+            return new PartyQueueInfo(Map.of(), null);
         }
         return partyService.getPartyQueueInfo(user.getPartyId());
     }

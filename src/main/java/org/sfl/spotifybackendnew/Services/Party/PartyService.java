@@ -173,21 +173,21 @@ public class PartyService {
         messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
     }
 
-    public List<Track> getUserQueue(String partyId, UUID userId) {
+    public Map<UUID, Track> getUserQueue(String partyId, UUID userId) {
         validatePartyId(partyId);
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
         return party.getUserQueue(userId);
     }
 
-    public void removeFromUserQueue(String partyId, UUID userId, int index) {
+    public void removeFromUserQueue(String partyId, UUID userId, UUID queueItemId) {
         validatePartyId(partyId);
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
 
-        log.info("removing track #{} on user {} queue in party {}", index, userId, partyId);
+        log.info("removing track with queueItemId: {} on user {} queue in party {}", queueItemId, userId, partyId);
 
-        party.removeFromUserQueue(userId, index);
+        party.removeFromUserQueue(userId, queueItemId);
     }
 
     public PartyQueueInfo getPartyQueueInfo(String partyId) {
