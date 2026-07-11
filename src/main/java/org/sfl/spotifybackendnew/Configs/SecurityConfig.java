@@ -111,9 +111,7 @@ public class SecurityConfig {
 
             if (session != null) {
                 oldUser = (UserData) session.getAttribute("OLD_USER");
-//                session.invalidate();
-                request.changeSessionId();
-                session.removeAttribute("OLD_USER");
+                session.invalidate();
             }
 
             userSessionService.initializeSessionAfterSpotifyLogin(authentication, request, response, oldUser);
