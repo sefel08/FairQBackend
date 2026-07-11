@@ -5,8 +5,8 @@ plugins {
 }
 
 group = "org.sfl"
-version = "0.0.1-SNAPSHOT"
-description = "SpotifyBackendNew"
+version = "0.1"
+description = "FairQ Backend"
 
 java {
     toolchain {
