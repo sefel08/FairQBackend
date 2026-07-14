@@ -30,13 +30,8 @@ public class SessionComponent {
 
             if (auth != null && auth.getPrincipal() instanceof UserData user) {
                 log.info("Session of user {} timed out. Removing from party: {}", user.getDisplayName(), user.getPartyId() != null ? user.getPartyId() : "None");
-
-                if (user.getPartyId() != null) {
+                if (user.getPartyId() != null)
                     partyService.removeUserFromParty(user.getPartyId(), user.getUserId(), user.isPlayer());
-                    user.setPartyId(null);
-                    user.clearRoles();
-                    messagingService.sendPrivateUpdate(user.getUserId(), MessageType.REFRESH_STATUS);
-                }
             }
         }
     }

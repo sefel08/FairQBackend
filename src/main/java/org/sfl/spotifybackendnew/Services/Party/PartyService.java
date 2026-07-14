@@ -1,6 +1,7 @@
 package org.sfl.spotifybackendnew.Services.Party;
 
 import lombok.extern.slf4j.Slf4j;
+import org.sfl.spotifybackendnew.Controllers.PartyController;
 import org.sfl.spotifybackendnew.DTOs.Music.AddedTrack;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.DTOs.Party.PartyQueueInfo;
@@ -9,6 +10,7 @@ import org.sfl.spotifybackendnew.DTOs.Party.SimpleResponse;
 import org.sfl.spotifybackendnew.DTOs.User.SafeUserProfile;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
+import org.sfl.spotifybackendnew.DTOs.User.UserWithId;
 import org.sfl.spotifybackendnew.Enums.MessageType;
 import org.sfl.spotifybackendnew.Exceptions.PartyNotFoundException;
 import org.sfl.spotifybackendnew.Objects.Party.PartyPlayer;
@@ -101,12 +103,14 @@ public class PartyService {
         return new SimpleResponse(true, "Joined party successfully");
     }
 
-    public void removeUserFromParty(String partyId, UUID userId, boolean isPlayer) {
+    // returns true if user was a participant of this party and was removed
+    public boolean removeUserFromParty(String partyId, UUID userId, boolean isPlayer) {
         validatePartyId(partyId);
         PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
                 .orElseThrow(() -> new PartyNotFoundException(partyId));
         if (isPlayer || party.isUserInParty(userId)) // remove if user is player or user is participant
-            party.removeUser(userId);
+            return party.removeUser(userId);
+        return false;
     }
 
     public void updateUserProfile(String partyId, UserData user) {
@@ -225,6 +229,11 @@ public class PartyService {
         return party.cancelUserSkipVote(userId);
     }
 
+    public List<UserWithId> getHostUsers(String partyId) {
+        validatePartyId(partyId);
+        PartySession party = partySessionMap.get(partyId);
+        return party.getUsersWithId();
+    }
 
     private void validatePartyId(String partyId) {
         if (partyId == null) {

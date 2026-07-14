@@ -7,14 +7,19 @@ import org.sfl.spotifybackendnew.DTOs.Party.PartyQueueInfo;
 import org.sfl.spotifybackendnew.DTOs.Party.PartySettings;
 import org.sfl.spotifybackendnew.DTOs.Party.SimpleResponse;
 import org.sfl.spotifybackendnew.DTOs.User.SafeUserProfile;
+import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
+import org.sfl.spotifybackendnew.DTOs.User.UserWithId;
 import org.sfl.spotifybackendnew.Exceptions.PartyNotFoundException;
 import org.sfl.spotifybackendnew.Services.Party.PartyService;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -71,8 +76,6 @@ public class PartyController {
         try {
             log.info("User {} is leaving party {}", user.getUserId(), user.getPartyId());
             partyService.removeUserFromParty(user.getPartyId(), user.getUserId(), user.isPlayer());
-            user.setPartyId(null);
-            user.clearRoles();
             return new SimpleResponse(true, "Left the party successfully");
         } catch (PartyNotFoundException e) {
             log.error("Party not found for user {} when trying to leave", user.getUserId());
@@ -143,6 +146,33 @@ public class PartyController {
         } catch (PartyNotFoundException e) {
             log.error("Party not found for user {} when canceling his skip", user.getUserId());
             return 0;
+        }
+    }
+
+    // host mappings
+
+    public record RemoveUserRequest(UUID userId) {}
+
+    @GetMapping("/host/users")
+    public List<UserWithId> getHostUsers(@AuthenticationPrincipal UserData user) {
+        if (user.getPartyId() == null || !Objects.equals(user.getPartyId(), user.getSpotifyId())) {
+            return List.of();
+        }
+        return partyService.getHostUsers(user.getPartyId());
+    }
+    @DeleteMapping("/host/users")
+    public SimpleResponse removeUser(@AuthenticationPrincipal UserData user, @RequestBody RemoveUserRequest request) {
+        if (user.getPartyId() == null || !Objects.equals(user.getPartyId(), user.getSpotifyId())) {
+            return new SimpleResponse(false, "You are not the owner of the party");
+        }
+        if (request.userId == null) {
+            return new SimpleResponse(false, "You must send userId to remove");
+        }
+        boolean removed = partyService.removeUserFromParty(user.getPartyId(), request.userId, false);
+        if (removed) {
+            return new SimpleResponse(true, "User removed successfully");
+        } else {
+            return new SimpleResponse(false, "User is not in the party");
         }
     }
 }

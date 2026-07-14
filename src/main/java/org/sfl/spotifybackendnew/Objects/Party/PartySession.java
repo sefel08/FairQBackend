@@ -7,6 +7,7 @@ import org.sfl.spotifybackendnew.DTOs.Music.Track;
 import org.sfl.spotifybackendnew.DTOs.Party.PartySettings;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.sfl.spotifybackendnew.DTOs.User.UserProfile;
+import org.sfl.spotifybackendnew.DTOs.User.UserWithId;
 import org.sfl.spotifybackendnew.Enums.MessageType;
 import org.sfl.spotifybackendnew.Objects.SmartQueue.SmartQueue;
 import org.sfl.spotifybackendnew.Services.Messages.MessagingService;
@@ -86,18 +87,27 @@ public class PartySession {
             log.info("Current users in party {}: {} ({})", partyId, userMap.keySet(), userMap.size());
         }
     }
-    public void removeUser(UUID userId) {
+    public boolean removeUser(UUID userId) {
         synchronized (userMapLock) {
             if (partyPlayer != null && partyPlayer.getPlayerId().equals(userId)) {
                 log.info("Player {} left the party, clearing player", userId);
                 clearPlayer();
                 messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
             }
-            if (userMap.remove(userId) != null) {
+            PartyUser user = userMap.remove(userId);
+            if (user != null) {
                 joinOrder.remove(userId);
+                UserData userSession = user.getUserSession();
+                userSession.clearRoles();
+                userSession.setPartyId(null);
+                messagingService.sendPrivateUpdate(userId, MessageType.REFRESH_STATUS);
                 messagingService.sendUpdate(partyId, MessageType.PARTY_USERS_CHANGED);
                 log.info("Removed user {} from party with id {}", userId, partyId);
                 log.info("Current users in party {}: {} ({})", partyId, userMap.keySet(), userMap.size());
+                return true;
+            } else {
+                log.info("User {} was not found in party with id {} in removing process", userId, partyId);
+                return false;
             }
         }
     }
@@ -221,6 +231,14 @@ public class PartySession {
         }
     }
 
+    // methods for host
+    public List<UserWithId> getUsersWithId() {
+        return userMap.values().stream()
+                .map(user -> new UserWithId(user.getId(), user.getProfile()))
+                .filter(userWithId -> userWithId.profile() != null && !Objects.equals(userWithId.profile().spotifyId(), partyId)) // remove the host from the list
+                .toList();
+    }
+
     private void incrementFallbackIndex() {
         fallbackIndex++;
         if (fallbackIndex >= totalFallbackTracks) {
@@ -265,12 +283,6 @@ public class PartySession {
                 if (userProfile.spotifyAuthorized() && Objects.equals(userProfile.spotifyId(), profile.spotifyId())) {
                     Map<UUID, Track> oldQueue = user.getQueue();
                     removeUser(user.getId());
-                    UserData userSession = user.getUserSession();
-                    userSession.setPartyId(null);
-                    userSession.setUser(false);
-                    userSession.setPlayer(false);
-                    userSession.setHost(false);
-                    messagingService.sendPrivateUpdate(user.getId(), MessageType.REFRESH_STATUS);
                     log.info("Removed duplicate spotify user");
                     return oldQueue;
                 }
