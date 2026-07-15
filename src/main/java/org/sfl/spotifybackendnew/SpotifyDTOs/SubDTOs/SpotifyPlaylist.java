@@ -1,9 +1,9 @@
 package org.sfl.spotifybackendnew.SpotifyDTOs.SubDTOs;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import tools.jackson.databind.JsonNode;
 
 import java.util.List;
 
@@ -15,6 +15,10 @@ public class SpotifyPlaylist {
     private List<SpotifyImage> images;
     @JsonProperty("href")
     private String spotifyUrl;
-    @JsonIgnore
-    private List<SpotifyTrack> tracks;
+    private Integer trackCount;
+
+    @JsonProperty("items")
+    private void unwrapper(JsonNode itemsObject) {
+        trackCount = itemsObject.get("total").asInt();
+    }
 }

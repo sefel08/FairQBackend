@@ -1,10 +1,13 @@
 package org.sfl.spotifybackendnew.Services.Spotify;
 
 import lombok.extern.slf4j.Slf4j;
+import org.sfl.spotifybackendnew.DTOs.Music.SearchResult;
+import org.sfl.spotifybackendnew.DTOs.Music.TrackContainerItem;
+import org.sfl.spotifybackendnew.Enums.TrackContainerType;
 import org.sfl.spotifybackendnew.Exceptions.SpotifyClientException;
 import org.sfl.spotifybackendnew.Exceptions.SpotifyServiceException;
-import org.sfl.spotifybackendnew.DTOs.Music.Playlist;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifyGetArtistAlbumsResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifyGetUserPlaylistsResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifySearchResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.SubDTOs.*;
@@ -42,37 +45,42 @@ public class SpotifyProxyService {
             return null;
         }
     }
-    public List<Track> searchTracks(String query) {
+    public SearchResult searchTracks(String query) {
         try {
             SpotifySearchResponse response = spotifyClient.search(query);
 
-            //todo check other containers
-            if (response == null || response.getTracks() == null) {
-                return List.of();
+            if (response == null) {
+                return new SearchResult(List.of(), List.of());
             }
 
-            return response.getTracks().stream()
+            List<Track> tracks = response.getTracks().stream()
                     .map(this::mapToTrackDTO)
                     .toList();
+
+            List<TrackContainerItem> albums = response.getAlbums().stream()
+                    .map(this::mapToAlbumDTO)
+                    .toList();
+
+            return new SearchResult(tracks, albums);
 
         } catch (SpotifyClientException e) {
             log.error("Error searching tracks: {}", e.getMessage());
             throw new SpotifyServiceException("Failed to search tracks");
         } catch (Exception e) {
             log.error("Unexpected error searching tracks: {}", e.getMessage());
-            return List.of();
+            return new SearchResult(List.of(), List.of());
         }
     }
     public List<Track> getPlaylistTracks(OAuth2AuthorizedClient authorizedClient, String playlistId, Integer offset) {
         try {
             String bearer = authorizedClient.getAccessToken().getTokenValue();
-            List<SpotifyTrack> playlistItems = spotifyClient.getPlaylistItems(bearer, playlistId, offset);
+            List<SpotifyTrack> playlistTracks = spotifyClient.getPlaylistTracks(bearer, playlistId, offset);
 
-            if (playlistItems == null || playlistItems.isEmpty()) {
+            if (playlistTracks == null || playlistTracks.isEmpty()) {
                 return List.of();
             }
 
-            return playlistItems.stream()
+            return playlistTracks.stream()
                     .map(this::mapToTrackDTO)
                     .toList();
 
@@ -81,6 +89,27 @@ public class SpotifyProxyService {
             throw new SpotifyServiceException("Failed to fetch playlist tracks");
         } catch (Exception e) {
             log.error("Unexpected error fetching playlist tracks: {}", e.getMessage());
+            return List.of();
+        }
+    }
+    public List<Track> getAlbumTracks(String albumId, Integer offset) {
+        try {
+            List<SpotifyImage> albumImages = spotifyClient.getAlbumImages(albumId);
+            List<SpotifyTrack> albumTracks = spotifyClient.getAlbumTracks(albumId, offset);
+
+            if (albumTracks == null || albumTracks.isEmpty()) {
+                return List.of();
+            }
+
+            return albumTracks.stream()
+                    .map(track -> mapToTrackDTO(track, albumImages))
+                    .toList();
+
+        } catch (SpotifyClientException e) {
+            log.error("Error fetching album tracks: {}", e.getMessage());
+            throw new SpotifyServiceException("Failed to fetch album tracks");
+        } catch (Exception e) {
+            log.error("Unexpected error fetching album tracks: {}", e.getMessage());
             return List.of();
         }
     }
@@ -102,7 +131,7 @@ public class SpotifyProxyService {
             return null;
         }
     }
-    public List<Playlist> getUserPlaylists(OAuth2AuthorizedClient authorizedClient) {
+    public List<TrackContainerItem> getUserPlaylists(OAuth2AuthorizedClient authorizedClient) {
         try {
             String bearer = authorizedClient.getAccessToken().getTokenValue();
             SpotifyGetUserPlaylistsResponse response = spotifyClient.getUserPlaylists(bearer);
@@ -135,25 +164,66 @@ public class SpotifyProxyService {
             return -1;
         }
     }
+    public List<TrackContainerItem> getArtistAlbums(String artistId) {
+        try {
+            SpotifyGetArtistAlbumsResponse response = spotifyClient.getArtistAlbums(artistId);
+
+            if (response == null || response.getAlbums() == null) {
+                return List.of();
+            }
+
+            return response.getAlbums().stream()
+                    .map(this::mapToAlbumDTO)
+                    .toList();
+
+        } catch (SpotifyClientException e) {
+            log.error("Error fetching artist albums: {}", e.getMessage());
+            throw new SpotifyServiceException("Failed to fetch artist albums");
+        } catch (Exception e) {
+            log.error("Unexpected error fetching artist albums: {}", e.getMessage());
+            return List.of();
+        }
+    }
 
     //helper methods
     private Track mapToTrackDTO(SpotifyTrack track) {
         return new Track(
-                track.getId(),
-                track.getName(),
-                getArtistNames(track.getArtists()),
-                getImageUrl(track.getImages()),
-                track.getDurationMs(),
-                track.getSpotifyUrl(),
-                track.getUri()
+            track.getId(),
+            track.getName(),
+            getArtistNames(track.getArtists()),
+            getImageUrl(track.getImages()),
+            track.getDurationMs(),
+            track.getSpotifyUrl(),
+            track.getUri()
         );
     }
-    private Playlist mapToPlaylistDTO(SpotifySimplePlaylist playlist) {
-        return new Playlist(
+    private Track mapToTrackDTO(SpotifyTrack track, List<SpotifyImage> images) {
+        return new Track(
+            track.getId(),
+            track.getName(),
+            getArtistNames(track.getArtists()),
+            getImageUrl(images),
+            track.getDurationMs(),
+            track.getSpotifyUrl(),
+            track.getUri()
+        );
+    }
+    private TrackContainerItem mapToPlaylistDTO(SpotifyPlaylist playlist) {
+        return new TrackContainerItem(
+                TrackContainerType.PLAYLIST,
                 playlist.getId(),
                 playlist.getName(),
                 getImageUrl(playlist.getImages()),
                 playlist.getTrackCount()
+        );
+    }
+    private TrackContainerItem mapToAlbumDTO(SpotifyAlbum album) {
+        return new TrackContainerItem(
+                TrackContainerType.ALBUM,
+                album.getId(),
+                album.getName(),
+                getImageUrl(album.getImages()),
+                album.getTotal_tracks()
         );
     }
 
@@ -167,6 +237,6 @@ public class SpotifyProxyService {
         return Optional.ofNullable(spotifyImageList)
                 .filter(images -> !images.isEmpty())
                 .map(images -> images.getFirst().getUrl())
-                .orElse("https://link-do-domyslnej-okladki.png");
+                .orElse(null);
     }
 }

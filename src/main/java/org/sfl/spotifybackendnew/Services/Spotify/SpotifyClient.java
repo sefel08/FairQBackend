@@ -3,13 +3,13 @@ package org.sfl.spotifybackendnew.Services.Spotify;
 import jakarta.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
 import org.sfl.spotifybackendnew.Exceptions.SpotifyClientException;
+import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifyGetArtistAlbumsResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifyGetUserPlaylistsResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.ResponseDTOs.SpotifySearchResponse;
 import org.sfl.spotifybackendnew.SpotifyDTOs.SpotifyWrappersDTOs.SpotifyTrackWrapper;
 import org.sfl.spotifybackendnew.SpotifyDTOs.SubDTOs.*;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
@@ -54,7 +54,7 @@ public class SpotifyClient {
             throw new SpotifyClientException("Failed to fetch user playlists: " + e.getMessage(), e);
         }
     }
-    public List<SpotifyTrack> getPlaylistItems(String accessToken, String playlistId, Integer offset) {
+    public List<SpotifyTrack> getPlaylistTracks(String accessToken, String playlistId, Integer offset) {
         try {
             UriComponentsBuilder urlBuilder = UriComponentsBuilder.fromUriString(BASE_URL + "/playlists/" + playlistId + "/items")
                     .queryParam("limit", 50);
@@ -81,6 +81,32 @@ public class SpotifyClient {
 
         } catch (Exception e) {
             throw new SpotifyClientException("Failed to fetch playlist data: " + e.getMessage(), e);
+        }
+    }
+    public List<SpotifyTrack> getAlbumTracks(String albumId, Integer offset) {
+        try {
+            UriComponentsBuilder urlBuilder = UriComponentsBuilder.fromUriString(BASE_URL + "/albums/" + albumId + "/tracks")
+                    .queryParam("limit", 50);
+
+            if (offset != null) urlBuilder.queryParam("offset", offset);
+
+            String url = urlBuilder.build().toUriString();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(spotifyTokenService.getApplicationToken());
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            JsonNode json = Objects.requireNonNull(restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    JsonNode.class
+            ).getBody());
+
+            return jsonMapper.readerForListOf(SpotifyTrack.class).readValue(json.get("items"));
+
+        } catch (Exception e) {
+            throw new SpotifyClientException("Failed to fetch album tracks: " + e.getMessage(), e);
         }
     }
     public SpotifyTrack getPlaylistItem(String accessToken, String playlistId, int index) {
@@ -114,7 +140,7 @@ public class SpotifyClient {
             String url = UriComponentsBuilder.fromUriString(BASE_URL + "/search")
                     .queryParam("q", query)
                     .queryParam("limit", 10)
-                    .queryParam("type", "track")
+                    .queryParam("type", "track,album")
                     .toUriString();
 
             HttpHeaders headers = new HttpHeaders();
@@ -132,9 +158,12 @@ public class SpotifyClient {
 
             List<SpotifyTrack> tracks = jsonMapper.readerForListOf(SpotifyTrack.class)
                     .readValue(json.get("tracks").get("items"));
-            //todo albums and others containers
+
+            List<SpotifyAlbum> albums = jsonMapper.readerForListOf(SpotifyAlbum.class)
+                    .readValue(json.get("albums").get("items"));
 
             response.setTracks(tracks);
+            response.setAlbums(albums);
 
             return response;
 
@@ -187,6 +216,50 @@ public class SpotifyClient {
 
         } catch (Exception e) {
             throw new SpotifyClientException("Failed getting total number of tracks in playlist: " + e.getMessage(), e);
+        }
+    }
+    public SpotifyGetArtistAlbumsResponse getArtistAlbums(String artistId) {
+        try {
+            String url = BASE_URL + "/artists/" + artistId + "/albums";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(spotifyTokenService.getApplicationToken());
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            return restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    SpotifyGetArtistAlbumsResponse.class
+            ).getBody();
+
+        } catch (Exception e) {
+            throw new SpotifyClientException("Failed to fetch artist albums: " + e.getMessage(), e);
+        }
+    }
+    public List<SpotifyImage> getAlbumImages(String albumId) {
+        try {
+            String url = BASE_URL + "/albums/" + albumId;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(spotifyTokenService.getApplicationToken());
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            JsonNode json = Objects.requireNonNull(restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    JsonNode.class
+            ).getBody());
+
+            if (!json.has("images")) {
+                return List.of();
+            }
+
+            return jsonMapper.readerForListOf(SpotifyImage.class).readValue(json.get("images"));
+
+        } catch (Exception e) {
+            throw new SpotifyClientException("Failed to fetch album images: " + e.getMessage(), e);
         }
     }
 

@@ -3,7 +3,9 @@ package org.sfl.spotifybackendnew.Controllers;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.sfl.spotifybackendnew.DTOs.Music.Playlist;
+import org.sfl.spotifybackendnew.DTOs.Music.SearchResult;
 import org.sfl.spotifybackendnew.DTOs.Music.Track;
+import org.sfl.spotifybackendnew.DTOs.Music.TrackContainerItem;
 import org.sfl.spotifybackendnew.DTOs.User.UserData;
 import org.sfl.spotifybackendnew.Services.Security.SpotifyAuthorizedClientService;
 import org.sfl.spotifybackendnew.Services.Spotify.SpotifyProxyService;
@@ -29,19 +31,29 @@ public class SpotifyProxyController {
     }
 
     @GetMapping("/search")
-    public List<Track> searchTracks(@RequestParam String query) {
+    public SearchResult searchTracks(@RequestParam String query) {
         return spotifyProxyService.searchTracks(query);
     }
 
     @GetMapping("/user-playlists")
-    public List<Playlist> getUserPlaylists(@AuthenticationPrincipal UserData user) {
+    public List<TrackContainerItem> getUserPlaylists(@AuthenticationPrincipal UserData user) {
         OAuth2AuthorizedClient authorizedClient = spotifyAuthorizedClientService.getAuthorizedClient(user);
         return spotifyProxyService.getUserPlaylists(authorizedClient);
+    }
+
+    @GetMapping("/artist")
+    public List<TrackContainerItem> getArtistAlbums(@RequestParam String artistId) {
+        return spotifyProxyService.getArtistAlbums(artistId);
     }
 
     @GetMapping("/playlist")
     public List<Track> getPlaylistTracks(@AuthenticationPrincipal UserData user, @RequestParam String playlistId, @RequestParam Integer offset) {
         OAuth2AuthorizedClient authorizedClient = spotifyAuthorizedClientService.getAuthorizedClient(user);
         return spotifyProxyService.getPlaylistTracks(authorizedClient, playlistId, offset);
+    }
+
+    @GetMapping("/album")
+    public List<Track> getAlbumTracks(@RequestParam String albumId, @RequestParam Integer offset) {
+        return spotifyProxyService.getAlbumTracks(albumId, offset);
     }
 }
