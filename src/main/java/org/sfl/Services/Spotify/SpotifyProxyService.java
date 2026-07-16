@@ -153,7 +153,7 @@ public class SpotifyProxyService {
                     .toList();
 
         } catch (SpotifyClientException e) {
-            log.error("Error fetching user playlists: {}", e.getMessage());
+            log.error("Error fetching user playlists: {}", e.getLocalizedMessage());
             throw new SpotifyServiceException("Failed to fetch user playlists");
         } catch (Exception e) {
             log.error("Unexpected error fetching user playlists: {}", e.getMessage());

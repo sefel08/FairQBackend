@@ -52,7 +52,9 @@ public class SpotifyTokenService {
             );
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                return (String) response.getBody().get("access_token");
+                String token = response.getBody().get("access_token").toString();
+                log.info("Spotify App Token: {}", token);
+                return token;
             } else {
                 throw new RuntimeException("Failed to get Spotify app token. Status: " + response.getStatusCode());
             }

@@ -13,6 +13,8 @@ import org.sfl.SpotifyDTOs.SubDTOs.SpotifyTrack;
 import org.sfl.SpotifyDTOs.SubDTOs.*;
 import org.springframework.http.*;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.JsonNode;
@@ -144,6 +146,7 @@ public class SpotifyClient {
                     .queryParam("q", query)
                     .queryParam("limit", 10)
                     .queryParam("type", "track,album,artist")
+                    .queryParam("market", "PL")
                     .toUriString();
 
             HttpHeaders headers = new HttpHeaders();
@@ -252,12 +255,14 @@ public class SpotifyClient {
             headers.setBearerAuth(spotifyTokenService.getApplicationToken());
             HttpEntity<Void> entity = new HttpEntity<>(headers);
 
-            return restTemplate.exchange(
+            ResponseEntity<SpotifyGetArtistAlbumsResponse> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     entity,
                     SpotifyGetArtistAlbumsResponse.class
-            ).getBody();
+            );
+
+            return response.getBody();
 
         } catch (Exception e) {
             throw new SpotifyClientException("Failed to fetch artist albums: " + e.getMessage(), e);
