@@ -3,10 +3,12 @@ package org.sfl.Controllers;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.sfl.DTOs.Party.SimpleResponse;
 import org.sfl.Services.User.UserSessionService;
 import org.sfl.DTOs.User.UserData;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,5 +44,11 @@ public class UserSessionController {
         userSessionService.initializeSessionForGuest(request, response, displayName);
 
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/logout")
+    public SimpleResponse logoutSpotify(@AuthenticationPrincipal UserData user, Authentication authentication, HttpServletRequest request, HttpServletResponse response) {
+        userSessionService.logoutSpotify(user, request, response, authentication);
+        return new SimpleResponse(true, "Spotify logout successful");
     }
 }

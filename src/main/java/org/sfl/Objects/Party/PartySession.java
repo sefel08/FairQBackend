@@ -88,11 +88,6 @@ public class PartySession {
     }
     public boolean removeUser(UUID userId) {
         synchronized (userMapLock) {
-            if (partyPlayer != null && partyPlayer.getPlayerId().equals(userId)) {
-                log.info("Player {} left the party, clearing player", userId);
-                clearPlayer();
-                messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
-            }
             PartyUser user = userMap.remove(userId);
             if (user != null) {
                 joinOrder.remove(userId);
@@ -109,6 +104,17 @@ public class PartySession {
                 return false;
             }
         }
+    }
+    public boolean removePlayerSession(UserData user) {
+        if (partyPlayer != null && partyPlayer.getPlayerId().equals(user.getUserId())) {
+            log.info("Player {} left the party, clearing player", user.getUserId());
+            clearPlayer();
+            user.clearRoles();
+            user.setPartyId(null);
+            messagingService.sendPrivateUpdate(user.getUserId(), MessageType.REFRESH_STATUS);
+            return true;
+        }
+        return false;
     }
     public boolean isUserInParty(UUID userId) {
         return userMap.containsKey(userId);
@@ -138,7 +144,9 @@ public class PartySession {
         partyPlayer = player;
     }
     public void clearPlayer() {
+        log.info("Clearing player for party {}", partyId);
         partyPlayer = null;
+        messagingService.sendUpdate(partyId, MessageType.PARTY_QUEUE_CHANGED);
     }
 
     public boolean playNext() {

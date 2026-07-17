@@ -53,7 +53,7 @@ public class PlayerController {
         }
 
         try {
-            partyService.clearPlayer(user, user.getPartyId());
+            partyService.clearPlayer(user);
             return ResponseEntity.status(HttpStatus.OK).build();
         } catch (PartyNotFoundException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Party connected with this device id does not exist");

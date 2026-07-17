@@ -16,6 +16,7 @@ import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
@@ -30,11 +31,15 @@ public class UserSessionService {
     private final JsonMapper mapper;
     private final PartyService partyService;
     private final OAuth2AuthorizedClientService authorizedClientService;
+    private final SecurityContextLogoutHandler logoutHandler;
 
     public UserSessionService(JsonMapper mapper, PartyService partyService, OAuth2AuthorizedClientService authorizedClientService) {
         this.mapper = mapper;
         this.partyService = partyService;
         this.authorizedClientService = authorizedClientService;
+        this.logoutHandler = new SecurityContextLogoutHandler();
+        this.logoutHandler.setInvalidateHttpSession(true);
+        this.logoutHandler.setClearAuthentication(true);
     }
 
     public void initializeSessionForGuest(HttpServletRequest request, HttpServletResponse response, String displayName) {
@@ -164,5 +169,19 @@ public class UserSessionService {
 
         HttpSessionSecurityContextRepository repo = new HttpSessionSecurityContextRepository();
         repo.saveContext(context, request, response);
+    }
+
+    public void logoutSpotify(UserData user, HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
+        if (user.getPartyId() != null) {
+            partyService.removeUserFromParty(user);
+        }
+        try {
+            String registrationId = user.isHasSpotifyPlayerPermissions() ? "spotify-host" : "spotify";
+            authorizedClientService.removeAuthorizedClient(registrationId, authentication.getName());
+        } catch (Exception e) {
+            // ignore if he doesn't exist
+        }
+
+        logoutHandler.logout(request, response, authentication);
     }
 }

@@ -71,7 +71,7 @@ public class PartyController {
 
         try {
             log.info("User {} is leaving party {}", user.getUserId(), user.getPartyId());
-            partyService.removeUserFromParty(user.getPartyId(), user.getUserId(), user.isPlayer());
+            partyService.removeUserFromParty(user);
             return new SimpleResponse(true, "Left the party successfully");
         } catch (PartyNotFoundException e) {
             log.error("Party not found for user {} when trying to leave", user.getUserId());
@@ -164,7 +164,7 @@ public class PartyController {
         if (request.userId == null) {
             return new SimpleResponse(false, "You must send userId to remove");
         }
-        boolean removed = partyService.removeUserFromParty(user.getPartyId(), request.userId, false);
+        boolean removed = partyService.removeUserFromParty(user);
         if (removed) {
             return new SimpleResponse(true, "User removed successfully");
         } else {

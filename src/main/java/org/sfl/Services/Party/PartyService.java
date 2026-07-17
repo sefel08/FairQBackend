@@ -102,12 +102,20 @@ public class PartyService {
     }
 
     // returns true if user was a participant of this party and was removed
-    public boolean removeUserFromParty(String partyId, UUID userId, boolean isPlayer) {
-        validatePartyId(partyId);
-        PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
-                .orElseThrow(() -> new PartyNotFoundException(partyId));
-        if (isPlayer || party.isUserInParty(userId)) // remove if user is player or user is participant
-            return party.removeUser(userId);
+    public boolean removeUserFromParty(UserData user) {
+        validatePartyId(user.getPartyId());
+        PartySession party = Optional.ofNullable(partySessionMap.get(user.getPartyId()))
+                .orElseThrow(() -> new PartyNotFoundException(user.getPartyId()));
+        if (user.isUser()) // is in userMap and even if he is also a player he will be cleared
+            return party.removeUser(user.getUserId());
+        if (user.isPlayer()) // remove if user is player or user is participant
+            return party.removePlayerSession(user);
+        if (user.isHost()) // clear session data of that guy
+        {
+            user.clearRoles();
+            user.setPartyId(null);
+            messagingService.sendPrivateUpdate(user.getUserId(), MessageType.REFRESH_STATUS);
+        }
         return false;
     }
 
@@ -137,11 +145,10 @@ public class PartyService {
         party.initializePlayer(player);
     }
 
-    public void clearPlayer(UserData user, String partyId) {
-        validatePartyId(partyId);
-        PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
-                .orElseThrow(() -> new PartyNotFoundException(partyId));
-        log.info("Clearing player for party {}", partyId);
+    public void clearPlayer(UserData user) {
+        validatePartyId(user.getPartyId());
+        PartySession party = Optional.ofNullable(partySessionMap.get(user.getPartyId()))
+                .orElseThrow(() -> new PartyNotFoundException(user.getPartyId()));
         party.clearPlayer();
     }
 

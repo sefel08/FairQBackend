@@ -61,6 +61,8 @@ public class SecurityConfig {
                     .requestMatchers("/api/party/create").hasRole("SPOTIFY_USER")
                     //player endpoints only for spotify authenticated users
                     .requestMatchers("/api/player/**", "/api/spotify-token").hasRole("SPOTIFY_USER")
+                    //logout spotify only for spotify authenticated users
+                    .requestMatchers("/api/user/spotify/logout").hasRole("SPOTIFY_USER")
 
                     .anyRequest().authenticated()
             )
