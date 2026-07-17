@@ -164,11 +164,19 @@ public class PartyController {
         if (request.userId == null) {
             return new SimpleResponse(false, "You must send userId to remove");
         }
-        boolean removed = partyService.removeUserFromParty(user);
+        boolean removed = partyService.removeParticipantFromParty(request.userId, user.getPartyId());
         if (removed) {
             return new SimpleResponse(true, "User removed successfully");
         } else {
             return new SimpleResponse(false, "User is not in the party");
         }
+    }
+    @PostMapping("/host/skip")
+    public SimpleResponse skipAsHost(@AuthenticationPrincipal UserData user) {
+        if (user.getPartyId() == null || !Objects.equals(user.getPartyId(), user.getSpotifyId())) {
+            return new SimpleResponse(false, "You are not the owner of the party");
+        }
+        boolean played = partyService.playNextTrack(user.getPartyId());
+        return new SimpleResponse(played, played ? "Track skipped successfully" : "Failed to skip track");
     }
 }

@@ -58,6 +58,8 @@ public class PartyService {
 
         //create new party for user
         PartySession party = new PartySession(user, userToken, partySettings, totalTracks, messagingService, spotifyProxyService);
+        PartySession lastPartySession = partySessionMap.get(spotifyUserId);
+        if (lastPartySession != null) lastPartySession.destroy();
         partySessionMap.put(spotifyUserId, party);
         user.setPartyId(spotifyUserId);
     }
@@ -117,6 +119,12 @@ public class PartyService {
             messagingService.sendPrivateUpdate(user.getUserId(), MessageType.REFRESH_STATUS);
         }
         return false;
+    }
+    public boolean removeParticipantFromParty(UUID userId, String partyId) {
+        validatePartyId(partyId);
+        PartySession party = Optional.ofNullable(partySessionMap.get(partyId))
+                .orElseThrow(() -> new PartyNotFoundException(partyId));
+        return party.removeUser(userId);
     }
 
     public void updateUserProfile(String partyId, UserData user) {

@@ -66,6 +66,16 @@ public class PartySession {
         }
         triggerFallbackTrackReplenishment(userToken);
     }
+    public void destroy() {
+        log.info("Destroying party session for party {}", partyId);
+        if (partyPlayer != null)
+            partyPlayer.decouplePlayerSession();
+        synchronized (userMapLock) {
+            for (UUID userId : userMap.keySet()) {
+                removeUser(userId);
+            }
+        }
+    }
 
     public void addUser(UserProfile profile, UserData user) {
         synchronized (userMapLock) {

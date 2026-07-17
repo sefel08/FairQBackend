@@ -68,11 +68,6 @@ public class PlayerController {
                     .body(new PlayNextResponse(false, "You are not the owner of this party"));
         }
 
-        if (!user.isHasSpotifyPlayerPermissions() || !user.isPremium()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(new PlayNextResponse(false, "Missing Host permissions or Premium account"));
-        }
-
         if (user.getPartyId() == null) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body("You must be in a party to play next track");
