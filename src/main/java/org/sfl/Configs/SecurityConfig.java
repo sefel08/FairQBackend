@@ -56,7 +56,7 @@ public class SecurityConfig {
                     //logging in and status
                     .requestMatchers("/login/**", "/oauth2/**", "/api/user/login-as-guest", "/api/user/save-return-url", "/api/status").permitAll()
                     //fetching spotify account related data, only for spotify authenticated users
-                    .requestMatchers("/api/spotify/user-playlists").hasRole("SPOTIFY_USER")
+                    .requestMatchers("/api/spotify/user-playlists", "/api/spotify/playlist").hasRole("SPOTIFY_USER")
                     //creating party only for spotify authenticated users
                     .requestMatchers("/api/party/create").hasRole("SPOTIFY_USER")
                     //player endpoints only for spotify authenticated users
